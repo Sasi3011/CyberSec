@@ -17,7 +17,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("setup", "start", "stop", "clean", "info", "extern", "block", "status", "export", "attack", "simulate", "help")]
+    [ValidateSet("setup", "start", "stop", "clean", "info", "extern", "block", "status", "export", "attack", "simulate", "enterprise", "soc", "help")]
     [string]$Action = "help",
 
     [string]$HostIp,
@@ -257,6 +257,8 @@ function Get-ListenerPids {
 function Stop-PortListeners {
     param([int]$Port, [string]$Label = "service")
     foreach ($procId in (Get-ListenerPids -Port $Port)) {
+        # PID 4 = HTTP.sys kernel driver; cannot be killed — use Release-HttpSysPort
+        if ($procId -le 4) { continue }
         try {
             Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
             Write-Host "  Stopped $Label (PID $procId, port $Port)"
@@ -264,6 +266,84 @@ function Stop-PortListeners {
         catch { }
     }
     Start-Sleep -Milliseconds 300
+}
+
+function Release-HttpSysPort {
+    param([int]$Port)
+    $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $conn -or $conn.OwningProcess -ne 4) { return }
+    if (-not (Test-IsAdmin)) {
+        Write-Warning "Port $Port stuck on HTTP.sys (PID 4). Run as Admin: net stop http /y; net start http"
+        return
+    }
+    Write-Host "  Releasing stale HTTP.sys binding on port $Port..."
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    net stop http /y 2>&1 | Out-Null
+    Start-Sleep -Seconds 1
+    net start http 2>&1 | Out-Null
+    $ErrorActionPreference = $prevEap
+    Start-Sleep -Milliseconds 500
+}
+
+function Stop-UiServerProcesses {
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -match 'ui-server\.ps1' } |
+        ForEach-Object {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+    if ($script:uiProc -and -not $script:uiProc.HasExited) {
+        Stop-Process -Id $script:uiProc.Id -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Milliseconds 300
+}
+
+function Release-DashboardPort {
+    Stop-UiServerProcesses
+    Stop-PortListeners -Port $UiPort -Label "dashboard"
+    if (Test-PortOpen -Port $UiPort) {
+        Release-HttpSysPort -Port $UiPort
+    }
+}
+
+function Test-DashboardHealthy {
+    if ($script:uiProc -and $script:uiProc.HasExited) { return $false }
+    try {
+        $r = Invoke-WebRequest -Uri "http://127.0.0.1:$UiPort/api/health" -UseBasicParsing -TimeoutSec 3
+        return ($r.StatusCode -eq 200)
+    }
+    catch { return $false }
+}
+
+function Wait-DashboardReady {
+    param([int]$TimeoutSec = 45)
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $deadline) {
+        if ($script:uiProc -and $script:uiProc.HasExited) {
+            Start-Sleep -Milliseconds 400
+            continue
+        }
+        if (Test-DashboardHealthy) { return }
+        Start-Sleep -Milliseconds 400
+    }
+    throw "Dashboard did not respond on http://127.0.0.1:$UiPort (see .local\run\ui.err.log)"
+}
+
+function Start-DashboardProcess {
+    $uiScript = Join-Path $libDir "ui-server.ps1"
+    $uiErrLog = Join-Path $runDir "ui.err.log"
+    Release-DashboardPort
+    $script:uiProc = Start-Process powershell.exe `
+        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", $uiScript, "-Port", $UiPort) `
+        -WorkingDirectory $RepoRoot -RedirectStandardError $uiErrLog -PassThru -WindowStyle Hidden
+    Wait-DashboardReady
+    if ($script:uiProc.HasExited) {
+        if (Test-Path $uiErrLog) {
+            Get-Content $uiErrLog -Tail 15 | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+        }
+        throw "Dashboard crashed on startup. See .local\run\ui.err.log"
+    }
+    Write-Host "  Dashboard ready (PID $($script:uiProc.Id))"
 }
 
 $script:SimUsers = @("root","admin","administrator","user","test","guest","ubuntu","pi","oracle","deploy","attacker","scanner","bot","probe")
@@ -401,7 +481,7 @@ if (-not $IsHost) {
     Write-Host ""
     Write-Host "  .\run.ps1 attack -HostIp HOST_LAN_IP"
     Write-Host ""
-    Write-Host "  Full guide: ATTACK-DEMO.md"
+    Write-Host "  Full guide: CODEBASE.md"
     Write-Host ""
     exit 0
 }
@@ -420,11 +500,13 @@ function Show-Help {
     Write-Host "  .\scripts\run.ps1 export             Copy run.ps1 to Desktop"
     Write-Host "  .\scripts\run.ps1 stop               Stop all services"
     Write-Host "  .\scripts\run.ps1 clean              Unblock all, wipe DB, fresh start"
+    Write-Host "  .\scripts\run.ps1 enterprise         Build/start enterprise agent (Manager sync)"
+    Write-Host "  .\scripts\run.ps1 soc                Enterprise SOC dashboard (:3001)"
     Write-Host ""
     Write-Host "  Same Wi-Fi:    .\run.ps1 attack -HostIp LAN_IP"
     Write-Host "  Other network: .\run.ps1 attack -HostIp PUBLIC_IP  (see: run.ps1 extern)"
     Write-Host "  Metrics:       http://127.0.0.1:6060/metrics"
-    Write-Host "  Full guide:    ATTACK-DEMO.md"
+    Write-Host "  Full guide:    CODEBASE.md"
     Write-Host ""
 }
 
@@ -657,9 +739,10 @@ function Stop-AllServices {
     }
 
     Get-Process -Name "cybersec" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    foreach ($port in @($TestPort, $UiPort, $LapiPort, $MetricsPort)) {
+    foreach ($port in @($TestPort, $LapiPort, $MetricsPort)) {
         Stop-PortListeners -Port $port
     }
+    Release-DashboardPort
     Write-Host "Stopped."
 }
 
@@ -788,18 +871,8 @@ function Do-Start {
             -WorkingDirectory $RepoRoot -PassThru -WindowStyle Hidden
         Write-Host "  Bouncer ready (PID $($script:bouncerProc.Id))"
 
-        $uiScript = Join-Path $libDir "ui-server.ps1"
         Write-Host "Starting dashboard..."
-        $uiErrLog = Join-Path $runDir "ui.err.log"
-        $script:uiProc = Start-Process powershell.exe `
-            -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", $uiScript, "-Port", $UiPort) `
-            -WorkingDirectory $RepoRoot -RedirectStandardError $uiErrLog -PassThru -WindowStyle Hidden
-        Wait-PortReady -Port $UiPort -Name "Dashboard"
-        if ($script:uiProc.HasExited) {
-            if (Test-Path $uiErrLog) { Get-Content $uiErrLog -Tail 15 | ForEach-Object { Write-Host "  $_" -ForegroundColor Red } }
-            throw "Dashboard crashed on startup. See .local\run\ui.err.log"
-        }
-        Write-Host "  Dashboard ready (PID $($script:uiProc.Id))"
+        Start-DashboardProcess
 
         $allowName = "CyberSec-TestPort-$TestPort"
         if (-not (Get-NetFirewallRule -DisplayName $allowName -ErrorAction SilentlyContinue)) {
@@ -829,7 +902,7 @@ function Do-Start {
         Write-Host ""
         Write-Host "  Same Wi-Fi:       .\run.ps1 attack -HostIp $(if ($lanIp) { $lanIp } else { 'LAN_IP' })"
         Write-Host "  Mobile/other net: .\scripts\run.ps1 extern  (port forward + public IP)"
-        Write-Host "  Demo: see ATTACK-DEMO.md"
+        Write-Host "  Demo: see CODEBASE.md"
         Write-Host ""
         Write-Host "  DO NOT CLOSE THIS WINDOW - it keeps everything running"
         Write-Host "  Press Ctrl+C to stop everything"
@@ -842,15 +915,16 @@ function Do-Start {
                 Ensure-EngineRunning
                 Save-ProcessIds
             }
-            if ($script:uiProc.HasExited -and (Test-LapiHealthy)) {
+            if ((Test-LapiHealthy) -and -not (Test-DashboardHealthy)) {
                 Write-Host "WARN: Dashboard stopped - restarting..."
-                Stop-PortListeners -Port $UiPort -Label "dashboard"
-                $uiErrLog = Join-Path $runDir "ui.err.log"
-                $script:uiProc = Start-Process powershell.exe `
-                    -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", $uiScript, "-Port", $UiPort) `
-                    -WorkingDirectory $RepoRoot -RedirectStandardError $uiErrLog -PassThru -WindowStyle Hidden
-                Wait-PortReady -Port $UiPort -Name "Dashboard"
-                Save-ProcessIds
+                try {
+                    Start-DashboardProcess
+                    Save-ProcessIds
+                }
+                catch {
+                    Write-Host "  Dashboard restart failed: $($_.Exception.Message)" -ForegroundColor Red
+                    Start-Sleep -Seconds 10
+                }
             }
             if ($script:testProc.HasExited) {
                 Write-Host "WARN: Test server stopped - restarting..."
@@ -872,6 +946,38 @@ function Do-Start {
     }
 }
 
+function Do-SocDashboard {
+    if (-not $IsHost) {
+        Write-Host "soc action requires host repo" -ForegroundColor Red
+        return
+    }
+    $uiScript = Join-Path $libDir "enterprise-ui-server.ps1"
+    Write-Host "=== CyberSec Enterprise SOC Dashboard ===" -ForegroundColor Cyan
+    Write-Host "Open http://127.0.0.1:3001 — same UI as :3000 (auto-connects to Manager :8443)"
+    Write-Host "Tip: ensure nothing else is using port 3001"
+    & $uiScript -Port 3001 -ManagerUrl "http://localhost:8443"
+}
+
+function Do-Enterprise {
+    if (-not $IsHost) {
+        Write-Host "enterprise action requires host repo with bin\cybersec.exe" -ForegroundColor Red
+        return
+    }
+    $agentDir = Join-Path $RepoRoot "enterprise\agent"
+    $agentExe = Join-Path $RepoRoot "bin\cybersec-agent.exe"
+    Write-Host "=== CyberSec Enterprise Agent ===" -ForegroundColor Cyan
+    Push-Location $agentDir
+    go build -o $agentExe ./cmd/agent
+    Pop-Location
+    $installScript = Join-Path $agentDir "install.ps1"
+    if (Test-IsAdmin) {
+        & $installScript -ManagerUrl "http://localhost:8443"
+    } else {
+        Write-Host "Run as Administrator to install Windows service, or:" -ForegroundColor Yellow
+        Write-Host "  `$env:CS_AGENT_CONFIG='$env:ProgramData\CyberSec\agent\config.yaml'; & $agentExe -foreground"
+    }
+}
+
 switch ($Action) {
     "help"   { Show-Help }
     "setup"  { Do-Setup }
@@ -885,5 +991,7 @@ switch ($Action) {
     "export"   { Do-Export }
     "attack" { Do-RemoteAttack }
     "simulate" { Do-Simulate }
+    "enterprise" { Do-Enterprise }
+    "soc"        { Do-SocDashboard }
     default  { Show-Help }
 }
