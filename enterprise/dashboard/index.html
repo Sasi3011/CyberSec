@@ -1,0 +1,1243 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>CyberSec Enterprise — SOC Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --bg: #e4ebf4;
+      --bg-grad: linear-gradient(160deg, #d9e6f2 0%, #e8eef6 45%, #f0f4fa 100%);
+      --card: rgba(255,255,255,0.94);
+      --solid: #ffffff;
+      --mint: #e3f5ec;
+      --text: #1e293b;
+      --muted: #64748b;
+      --light: #94a3b8;
+      --accent: #3b82f6;
+      --accent-soft: #dbeafe;
+      --danger: #ef4444;
+      --danger-soft: #fee2e2;
+      --warn: #f59e0b;
+      --success: #10b981;
+      --success-soft: #d1fae5;
+      --shadow: 0 4px 24px rgba(15,23,42,0.06);
+      --shadow-lg: 0 12px 48px rgba(15,23,42,0.08);
+      --radius: 22px;
+      --radius-sm: 14px;
+      --pill: 999px;
+      --nav-h: 64px;
+      --sidebar-w: 240px;
+      --font: 'Poppins', sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{font-size:15px}
+    body{font-family:var(--font);background:var(--bg-grad);background-attachment:fixed;color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+    *,*::before,*::after,input,button,select,textarea,table,code,pre,kbd,samp{font-family:var(--font)!important}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
+
+    /* Layout shell */
+    .shell{display:flex;min-height:100vh}
+    .sidebar{
+      width:var(--sidebar-w);flex-shrink:0;background:var(--solid);
+      border-right:1px solid rgba(226,232,240,0.8);padding:20px 14px;
+      display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+      box-shadow:var(--shadow);
+    }
+    .sidebar-brand{display:flex;align-items:center;gap:10px;padding:8px 10px 24px}
+    .sidebar-logo{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#6366f1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px}
+    .sidebar-name{font-size:1rem;font-weight:700;letter-spacing:-0.02em}
+    .sidebar-sub{font-size:0.68rem;color:var(--muted);margin-top:1px}
+    .nav-item{
+      display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--radius-sm);
+      font-size:0.875rem;font-weight:500;color:var(--muted);cursor:pointer;border:none;
+      background:transparent;width:100%;text-align:left;transition:all .18s;margin-bottom:4px;
+    }
+    .nav-item:hover{background:#f1f5f9;color:var(--text)}
+    .nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+    .nav-item [data-lucide]{width:18px;height:18px;flex-shrink:0}
+    .sidebar-footer{margin-top:auto;padding:12px 10px;font-size:0.72rem;color:var(--light);line-height:1.5}
+    .sidebar-status{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f8fafc;border-radius:var(--radius-sm);margin-bottom:12px;font-size:0.78rem;font-weight:600}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
+    .dot.off{background:var(--light);animation:none}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    @keyframes pinPulse{0%{transform:scale(0.6);opacity:0.6}70%{transform:scale(1.8);opacity:0}100%{transform:scale(1.8);opacity:0}}
+
+    .main{flex:1;min-width:0;display:flex;flex-direction:column}
+    .topbar{
+      height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;
+      padding:0 28px;background:rgba(255,255,255,0.5);backdrop-filter:blur(12px);
+      border-bottom:1px solid rgba(226,232,240,0.6);position:sticky;top:0;z-index:50;
+    }
+    .topbar-title{font-size:1.15rem;font-weight:700;letter-spacing:-0.02em}
+    .topbar-right{display:flex;align-items:center;gap:10px}
+    .search-box{display:flex;align-items:center;gap:8px;background:var(--solid);border-radius:var(--pill);padding:8px 16px;box-shadow:var(--shadow);min-width:220px}
+    .search-box input{border:none;outline:none;background:transparent;font-family:var(--font);font-size:0.85rem;width:160px;color:var(--text)}
+    .icon-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--solid);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);transition:all .15s}
+    .icon-btn:hover{color:var(--accent);transform:scale(1.04)}
+    .content{padding:24px 28px 40px;max-width:1320px;width:100%;margin:0 auto}
+
+    /* Pages */
+    .page{display:none}
+    .page.active{display:block}
+
+    /* Cards */
+    .card{background:var(--card);backdrop-filter:blur(16px);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid rgba(255,255,255,0.9);overflow:hidden}
+    .card-pad{padding:22px 24px}
+    .card-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px 0;margin-bottom:4px}
+    .card-title{font-size:0.95rem;font-weight:700;display:flex;align-items:center;gap:8px}
+    .card-meta{font-size:0.75rem;color:var(--muted);font-weight:500}
+
+    /* Grid layouts */
+    .grid-overview{
+      display:grid;grid-template-columns:minmax(280px,320px) 1fr minmax(260px,300px);
+      grid-template-rows:auto auto;gap:20px;align-items:start;
+    }
+    .g-left{grid-column:1;grid-row:1/3;display:flex;flex-direction:column;gap:20px}
+    .g-center{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;gap:20px}
+    .g-right{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;gap:20px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+    @media(max-width:1100px){
+      .grid-overview,.grid-2,.grid-3{grid-template-columns:1fr}
+      .g-left,.g-center,.g-right{grid-column:auto;grid-row:auto}
+      .sidebar{display:none}
+    }
+
+    /* Hero */
+    .hero-label{font-size:0.78rem;color:var(--muted);font-weight:500;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+    .hero-value{font-size:2.35rem;font-weight:800;letter-spacing:-0.03em;line-height:1.1;margin-bottom:6px}
+    .hero-sub{font-size:0.78rem;color:var(--success);font-weight:600;margin-bottom:18px;display:flex;align-items:center;gap:6px}
+    .hero-actions{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--pill);font-family:var(--font);font-size:0.82rem;font-weight:600;border:none;cursor:pointer;transition:all .18s}
+    .btn-dark{background:var(--text);color:#fff}
+    .btn-dark:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+    .btn-light{background:var(--solid);color:var(--text);box-shadow:var(--shadow)}
+    .btn-light:hover{transform:translateY(-1px)}
+    .btn-danger{background:var(--danger-soft);color:var(--danger)}
+    .btn-danger:hover{background:var(--danger);color:#fff}
+    .btn-success{background:var(--success-soft);color:var(--success)}
+    .btn-success:hover{background:var(--success);color:#fff}
+    .btn-sm{padding:6px 12px;font-size:0.75rem}
+    .mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .mini-stat{background:rgba(248,250,252,0.9);border-radius:var(--radius-sm);padding:12px;text-align:center}
+    .mini-stat-val{font-size:1.25rem;font-weight:800}
+    .mini-stat-lbl{font-size:0.65rem;color:var(--muted);margin-top:2px;font-weight:500}
+
+    /* Nodes */
+    .nodes-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+    .node{min-width:130px;height:84px;border-radius:var(--radius-sm);padding:12px 14px;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;flex-shrink:0;color:#fff}
+    .node.n1{background:linear-gradient(135deg,#1e40af,#3b82f6)}
+    .node.n2{background:linear-gradient(135deg,#047857,#10b981)}
+    .node.n3{background:linear-gradient(135deg,#c2410c,#f97316)}
+    .node.n4{background:linear-gradient(135deg,#6d28d9,#8b5cf6)}
+    .node-type{font-size:0.62rem;opacity:.85;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+    .node-name{font-size:0.78rem;font-weight:700}
+
+    /* Charts */
+    .chart-box{height:240px;padding:8px 16px 16px;position:relative}
+    .chart-box-lg{height:300px;padding:8px 16px 20px;position:relative}
+    .chart-box-sm{height:180px;padding:8px 16px 12px;position:relative}
+
+    /* Map */
+    #map-main,#map-mini{height:100%;width:100%;border-radius:0}
+    .map-wrap{height:280px;position:relative}
+    .map-wrap-lg{height:520px;position:relative}
+    .leaflet-container{background:#e2ecf8!important;font-family:var(--font)!important}
+    .leaflet-popup-content,.leaflet-control-layers-list,.leaflet-control-scale-line{font-family:var(--font)!important}
+    .leaflet-control-layers{border-radius:10px!important;box-shadow:0 2px 12px rgba(0,0,0,0.12)!important;font-family:var(--font)!important;font-size:12px!important}
+    .leaflet-bar{border-radius:10px!important;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.12)!important}
+    .leaflet-bar a{width:36px!important;height:36px!important;line-height:36px!important;font-size:18px!important;font-family:var(--font)!important}
+    .leaflet-control-zoom{margin-top:12px!important;margin-right:12px!important}
+    .map-gps-banner{font-size:0.72rem;color:var(--warn);padding:8px 16px;background:#fffbeb;border-bottom:1px solid #fde68a;display:none;font-family:var(--font)!important}
+    .map-legend{
+      position:absolute;top:52px;left:12px;z-index:1000;display:flex;flex-direction:column;gap:6px;
+      background:rgba(255,255,255,0.94);backdrop-filter:blur(8px);padding:10px 14px;border-radius:12px;
+      box-shadow:0 2px 12px rgba(0,0,0,0.12);font-size:0.72rem;font-weight:600;pointer-events:none;
+    }
+    .map-legend span{display:flex;align-items:center;gap:8px;color:var(--muted)}
+    .map-legend .dot-host{width:10px;height:10px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 0 0 1px #2563eb}
+    .map-legend .dot-atk{width:10px;height:10px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 0 1px #ef4444}
+    .map-sidebar{display:flex;flex-direction:column;gap:8px;max-height:520px;overflow-y:auto;padding:16px}
+    .map-ip-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#f8fafc;border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;border:1px solid transparent}
+    .map-ip-item:hover,.map-ip-item.active{border-color:var(--accent);background:var(--accent-soft)}
+    .map-ip-flag{width:36px;height:36px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:1rem}
+    .map-ip-info{flex:1;min-width:0}
+    .map-ip-addr{font-weight:700;font-size:0.85rem;color:var(--accent)}
+    .map-ip-role{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--danger);margin-bottom:2px}
+    .map-ip-role.host{color:var(--accent)}
+    .map-ip-loc{font-size:0.72rem;color:var(--muted);margin-top:2px}
+
+    /* Transactions */
+    .tx-list{max-height:340px;overflow-y:auto}
+    .tx-item{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f1f5f9;transition:background .12s}
+    .tx-item:hover{background:rgba(59,130,246,0.04)}
+    .tx-icon{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .tx-icon.ban{background:var(--danger-soft);color:var(--danger)}
+    .tx-icon.alert{background:#fef3c7;color:var(--warn)}
+    .tx-info{flex:1;min-width:0}
+    .tx-name{font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tx-sub{font-size:0.72rem;color:var(--light);margin-top:2px}
+    .tx-badge{font-size:0.72rem;font-weight:700;padding:4px 10px;border-radius:var(--pill)}
+    .tx-badge.red{background:var(--danger-soft);color:var(--danger)}
+    .tx-badge.amber{background:#fef3c7;color:#b45309}
+
+    /* Bans page */
+    .block-form{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:20px 24px;background:#f8fafc;border-bottom:1px solid #e2e8f0}
+    .field{display:flex;flex-direction:column;gap:4px}
+    .field label{font-size:0.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    .field input,.field select{padding:10px 14px;border:1px solid #e2e8f0;border-radius:var(--radius-sm);font-family:var(--font);font-size:0.85rem;outline:none;min-width:180px}
+    .field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+    table{width:100%;border-collapse:collapse;font-size:0.84rem}
+    th{padding:10px 20px;text-align:left;font-size:0.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:#f8fafc;border-bottom:1px solid #e2e8f0}
+    td{padding:14px 20px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+    tr:hover td{background:rgba(59,130,246,0.03)}
+    .tag{display:inline-block;padding:3px 10px;border-radius:var(--pill);font-size:0.7rem;font-weight:600}
+    .tag-ban{background:var(--danger-soft);color:var(--danger)}
+    .tag-warn{background:#fef3c7;color:#b45309}
+    .tag-ok{background:var(--success-soft);color:var(--success)}
+    .ip-mono{font-weight:600;color:var(--accent);letter-spacing:0.02em}
+
+    .info-banner{
+      margin-bottom:20px;padding:16px 20px;background:var(--accent-soft);border-radius:var(--radius-sm);
+      border:1px solid rgba(59,130,246,0.2);font-size:0.84rem;line-height:1.55;color:var(--text);
+    }
+    .info-banner strong{font-weight:700;color:var(--accent)}
+    #unban-result{display:none;margin-bottom:20px;padding:16px 20px;border-radius:var(--radius-sm);font-size:0.84rem;line-height:1.5}
+    #unban-result.ok{display:block;background:var(--success-soft);color:#065f46;border:1px solid rgba(16,185,129,0.3)}
+    #unban-result.err{display:block;background:var(--danger-soft);color:#991b1b;border:1px solid rgba(239,68,68,0.3)}
+
+    /* Gauge */
+    .gauge-wrap{width:180px;height:100px;margin:0 auto}
+    .gauge-score{font-size:2rem;font-weight:800;text-align:center;margin-top:-8px}
+    .gauge-label{text-align:center;font-size:0.82rem;font-weight:600;margin-bottom:14px}
+
+    /* Promo */
+    .promo{background:var(--mint);border-radius:var(--radius);padding:22px;position:relative;overflow:hidden}
+    .promo::before{content:'';position:absolute;right:-20px;top:-20px;width:100px;height:100px;border-radius:50%;border:18px solid rgba(16,185,129,0.12)}
+    .promo p{font-size:0.88rem;font-weight:600;line-height:1.5;max-width:200px;position:relative;z-index:1;margin-bottom:14px}
+    .promo .btn{position:relative;z-index:1}
+
+    /* Toast */
+    #toast{position:fixed;bottom:24px;right:24px;padding:14px 22px;border-radius:var(--radius-sm);background:var(--text);color:#fff;font-size:0.85rem;font-weight:500;box-shadow:var(--shadow-lg);transform:translateY(80px);opacity:0;transition:all .3s;z-index:9999}
+    #toast.show{transform:translateY(0);opacity:1}
+    #toast.ok{background:var(--success)}
+    #toast.err{background:var(--danger)}
+
+    #alertbar{display:none;margin:0 28px 16px;padding:12px 18px;background:var(--danger-soft);border-radius:var(--radius-sm);color:var(--danger);font-size:0.84rem;font-weight:500}
+    .empty{padding:40px;text-align:center;color:var(--light);font-size:0.85rem}
+    .metric-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    .metric-lbl{width:130px;font-size:0.78rem;color:var(--muted);font-weight:500}
+    .metric-track{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}
+    .metric-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#3b82f6,#6366f1)}
+    .metric-val{width:36px;text-align:right;font-weight:700;font-size:0.82rem}
+
+    [data-lucide]{width:18px;height:18px;stroke-width:2}
+    .btn [data-lucide],.nav-item [data-lucide]{width:16px;height:16px}
+  </style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">SS</div>
+      <div>
+        <div class="sidebar-name">CyberSec</div>
+        <div class="sidebar-sub">Enterprise Fleet · :3001</div>
+      </div>
+    </div>
+    <div class="sidebar-status"><span class="dot" id="status-dot"></span><span id="status-text">Connecting...</span></div>
+    <nav>
+      <button class="nav-item active" data-page="overview"><i data-lucide="layout-dashboard"></i> Overview</button>
+      <button class="nav-item" data-page="incidents"><i data-lucide="bell"></i> Incidents</button>
+      <button class="nav-item" data-page="bans"><i data-lucide="shield-ban"></i> Bans & Unblock</button>
+      <button class="nav-item" data-page="map"><i data-lucide="map"></i> Live Map</button>
+      <button class="nav-item" data-page="analytics"><i data-lucide="bar-chart-3"></i> Analytics</button>
+      <button class="nav-item" data-page="engine"><i data-lucide="cpu"></i> Fleet</button>
+    </nav>
+    <div class="sidebar-footer">Enterprise SOC v1.0<br/>Manager :8443 · Fleet view</div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <h1 class="topbar-title" id="page-title">Overview</h1>
+      <div class="topbar-right">
+        <div class="search-box"><i data-lucide="search"></i><input type="text" id="search-input" placeholder="Search IP or scenario..."/></div>
+        <button class="icon-btn" id="btn-refresh" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+        <button class="icon-btn" title="Manager API" onclick="window.open('http://127.0.0.1:8443/health','_blank')"><i data-lucide="external-link"></i></button>
+      </div>
+    </header>
+
+    <div id="alertbar"></div>
+
+    <div class="content">
+      <!-- OVERVIEW -->
+      <section class="page active" id="page-overview">
+        <div class="grid-overview">
+          <div class="g-left">
+            <div class="card card-pad">
+              <div class="hero-label"><i data-lucide="shield-check"></i> Security Status</div>
+              <div class="hero-value" id="hero-bans">—</div>
+              <div class="hero-sub" id="hero-sub">Monitoring active</div>
+              <div class="hero-actions">
+                <button class="btn btn-dark" onclick="showPage('bans')"><i data-lucide="shield-ban"></i> Manage Bans</button>
+                <button class="btn btn-light" onclick="loadAll()"><i data-lucide="refresh-cw"></i> Refresh</button>
+              </div>
+              <div class="mini-stats">
+                <div class="mini-stat"><div class="mini-stat-val" id="s-alerts">—</div><div class="mini-stat-lbl">Alerts</div></div>
+                <div class="mini-stat"><div class="mini-stat-val" id="s-ips">—</div><div class="mini-stat-lbl">IPs</div></div>
+                <div class="mini-stat"><div class="mini-stat-val" id="s-events">—</div><div class="mini-stat-lbl">Events</div></div>
+              </div>
+            </div>
+            <div class="card card-pad">
+              <div class="card-title" style="margin-bottom:14px">Monitored Nodes</div>
+              <div class="nodes-row">
+                <div class="node n1"><div class="node-type">Core</div><div class="node-name">Engine</div></div>
+                <div class="node n2"><div class="node-type">Firewall</div><div class="node-name">Bouncer</div></div>
+                <div class="node n3"><div class="node-type">Trap</div><div class="node-name">Honeypot</div></div>
+                <div class="node n4"><div class="node-type">API</div><div class="node-name">LAPI</div></div>
+              </div>
+            </div>
+            <div class="promo">
+              <p>Real-time IP geolocation & automatic firewall blocking</p>
+              <button class="btn btn-dark" onclick="showPage('map')"><i data-lucide="map-pin"></i> Open Live Map</button>
+            </div>
+          </div>
+
+          <div class="g-center">
+            <div class="card">
+              <div class="card-head"><span class="card-title">Detection Overview</span><span class="card-meta" id="bar-meta">By scenario</span></div>
+              <div class="chart-box"><canvas id="chart-bar"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="card-head"><span class="card-title"><i data-lucide="map-pin"></i> Live Attack Map</span><span class="card-meta" id="map-mini-meta">0 IPs</span></div>
+              <div class="map-gps-banner" id="map-mini-gps-banner">Allow browser location to show your laptop vs attacker on the map.</div>
+              <div class="map-wrap">
+                <div class="map-legend">
+                  <span><i class="dot-host"></i> Your laptop</span>
+                  <span><i class="dot-atk"></i> Attacker IP</span>
+                </div>
+                <div id="map-mini"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-head"><span class="card-title">Attack Intensity</span><span class="card-meta">Real-time</span></div>
+              <div class="chart-box"><canvas id="chart-line"></canvas></div>
+            </div>
+          </div>
+
+          <div class="g-right">
+            <div class="card">
+              <div class="card-head"><span class="card-title">Live Incidents</span><span class="card-meta" id="tx-count">—</span></div>
+              <div class="tx-list" id="tx-list"><div class="empty">Loading...</div></div>
+            </div>
+            <div class="card card-pad">
+              <div class="card-title" style="text-align:center;margin-bottom:4px">Threat Level</div>
+              <div class="gauge-wrap"><canvas id="chart-gauge"></canvas></div>
+              <div class="gauge-score" id="gauge-score">—</div>
+              <div class="gauge-label" id="gauge-label">—</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INCIDENTS -->
+      <section class="page" id="page-incidents">
+        <div class="card">
+          <div class="card-head"><span class="card-title">All Incidents</span><span class="card-meta" id="inc-meta">—</span></div>
+          <div id="incidents-full" style="max-height:640px;overflow-y:auto"><div class="empty">Loading...</div></div>
+        </div>
+      </section>
+
+      <!-- BANS & UNBLOCK -->
+      <section class="page" id="page-bans">
+        <div class="info-banner">
+          <strong>Fleet-wide block</strong> adds an IOC on the Central Manager — all enrolled agents receive the block org-wide.
+          Local engine unblock on a single laptop still uses <code style="background:#fff;padding:2px 6px;border-radius:4px;font-size:0.8rem">.\scripts\run.ps1 block</code> on that endpoint.
+        </div>
+        <div id="unban-result"></div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-head"><span class="card-title"><i data-lucide="shield-plus"></i> Block IP Address</span></div>
+          <div class="block-form">
+            <div class="field"><label>IP Address</label><input type="text" id="block-ip" placeholder="e.g. 172.17.5.180"/></div>
+            <div class="field"><label>Duration</label><select id="block-duration"><option value="1h">1 hour</option><option value="4h" selected>4 hours</option><option value="24h">24 hours</option><option value="48h">48 hours</option></select></div>
+            <button class="btn btn-dark" onclick="blockIp()"><i data-lucide="ban"></i> Block IP</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title"><i data-lucide="shield-off"></i> Active Bans — Global Unblock</span><span class="card-meta" id="bans-page-meta">—</span></div>
+          <div id="bans-page-table"><div class="empty">Loading...</div></div>
+        </div>
+      </section>
+
+      <!-- LIVE MAP -->
+      <section class="page" id="page-map">
+        <div class="grid-2" style="grid-template-columns:1fr 320px">
+          <div class="card">
+            <div class="card-head"><span class="card-title"><i data-lucide="globe"></i> Real-Time Attack Origins</span><span class="card-meta" id="map-main-meta">—</span></div>
+            <div class="map-gps-banner" id="map-gps-banner">Allow browser location to show your laptop vs attacker on the map.</div>
+            <div class="map-wrap-lg">
+              <div class="map-legend">
+                <span><i class="dot-host"></i> Your laptop</span>
+                <span><i class="dot-atk"></i> Attacker IP</span>
+              </div>
+              <div id="map-main"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Located IPs</span></div>
+            <div class="map-sidebar" id="map-sidebar"><div class="empty">Loading...</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ANALYTICS -->
+      <section class="page" id="page-analytics">
+        <div class="grid-3" style="margin-bottom:20px">
+          <div class="card card-pad"><div class="hero-label">Events Processed</div><div class="hero-value" id="a-events">—</div></div>
+          <div class="card card-pad"><div class="hero-label">Buckets Overflowed</div><div class="hero-value" id="a-overflow">—</div></div>
+          <div class="card card-pad"><div class="hero-label">Parser Hits</div><div class="hero-value" id="a-parser">—</div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Scenario Distribution</span></div>
+            <div class="chart-box-lg"><canvas id="chart-doughnut"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Top Scenarios</span></div>
+            <div class="chart-box-lg"><canvas id="chart-hbar"></canvas></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <div class="card-head"><span class="card-title">Engine Metrics</span></div>
+          <div class="card-pad" id="metrics-bars"><div class="empty">Loading...</div></div>
+        </div>
+      </section>
+
+      <!-- FLEET -->
+      <section class="page" id="page-engine">
+        <div class="card card-pad" style="margin-bottom:20px">
+          <div class="card-title" style="margin-bottom:18px">Fleet Endpoints</div>
+          <div id="fleet-summary" style="font-size:0.85rem;color:var(--muted);margin-bottom:14px">—</div>
+          <div id="features-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px"></div>
+        </div>
+        <div class="card card-pad" id="fleet-detail-card" style="display:none">
+          <div class="card-title" style="margin-bottom:12px">Endpoint Detail</div>
+          <div id="fleet-detail-body"><div class="empty">Select an endpoint</div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const FONT = "'Poppins', sans-serif";
+const PAGE_TITLES = { overview:'Overview', incidents:'Incidents', bans:'Bans & Unblock', map:'Live Map', analytics:'Analytics', engine:'Fleet' };
+
+let mapMini, mapMain, barChart, lineChart, gaugeChart, doughnutChart, hbarChart;
+let mapMarkers = { mini: {}, main: {} };
+let mapLayers = { miniStreet: null, miniSat: null, mainStreet: null, mainSat: null };
+let userLocation = null;
+let userLocationMarkers = { mini: null, main: null };
+let geoCache = {}, ipGeoList = [];
+let trafficHistory = [];
+const MAX_TRAFFIC = 24;
+let lastData = { alerts: [], decisions: [], metrics: {} };
+let mapsInitialized = { mini: false, main: false };
+let lastIpKey = '';
+let mapUserControlled = { mini: false, main: false };
+let mapInitialFit = { mini: false, main: false };
+
+const MAP_OPTS = {
+  zoomControl: true, scrollWheelZoom: true, doubleClickZoom: true,
+  touchZoom: true, boxZoom: true, keyboard: true,
+  minZoom: 2, maxZoom: 19, zoomSnap: 0.25, zoomDelta: 1,
+  wheelPxPerZoomLevel: 120, inertia: true, inertiaDeceleration: 3000
+};
+
+const TILE_STREET = {
+  url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  opts: { maxZoom: 19, attribution: '&copy; OpenStreetMap' }
+};
+const TILE_SAT = {
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  opts: { maxZoom: 19, attribution: '&copy; Esri' }
+};
+
+function refreshIcons() { if (window.lucide) lucide.createIcons(); }
+
+function showPage(name) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.page === name));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+  document.getElementById('page-title').textContent = PAGE_TITLES[name] || name;
+  if (name === 'map') {
+    if (!mapsInitialized.main) initMapMain();
+    setTimeout(() => { if (mapMain) mapMain.invalidateSize(); }, 250);
+  }
+  if (name === 'overview' && mapMini) setTimeout(() => mapMini.invalidateSize(), 200);
+  refreshIcons();
+}
+
+document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => showPage(btn.dataset.page)));
+document.getElementById('btn-refresh').addEventListener('click', loadAll);
+
+function toast(msg, ok = true) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = ok ? 'show ok' : 'show err';
+  setTimeout(() => el.className = '', 3200);
+}
+
+function bindMapInteraction(map, key) {
+  ['zoomstart', 'dragstart', 'mousedown', 'touchstart'].forEach(ev => {
+    map.on(ev, () => { mapUserControlled[key] = true; });
+  });
+}
+
+function addMapControls(map, key) {
+  map.zoomControl.setPosition('topright');
+  const street = mapLayers[key + 'Street'];
+  const sat = mapLayers[key + 'Sat'];
+  L.control.layers(
+    { 'Street Map': street, 'Satellite': sat },
+    null, { position: 'topleft' }
+  ).addTo(map);
+  L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+  addLocateControl(map, key);
+  bindMapInteraction(map, key);
+}
+
+function addLocateControl(map, key) {
+  const ctrl = L.control({ position: 'bottomright' });
+  ctrl.onAdd = function() {
+    const wrap = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+    const a = L.DomUtil.create('a', '', wrap);
+    a.href = '#'; a.title = 'Your laptop location'; a.innerHTML = '&#9678;';
+    a.style.fontSize = '20px'; a.style.color = '#2563eb';
+    L.DomEvent.disableClickPropagation(wrap);
+    L.DomEvent.on(a, 'click', e => {
+      L.DomEvent.preventDefault(e);
+      if (userLocation) {
+        mapUserControlled[key] = true;
+        map.flyTo([userLocation.lat, userLocation.lon], 18, { duration: 0.7 });
+        if (userLocationMarkers[key]) userLocationMarkers[key].openPopup();
+      } else {
+        initUserLocation(true);
+        toast('Allow location in browser to show your laptop', false);
+      }
+    });
+    return wrap;
+  };
+  ctrl.addTo(map);
+}
+
+function hostPopupHtml() {
+  return '<div style="min-width:180px;line-height:1.45">' +
+    '<div style="font-size:0.65rem;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:.05em">Your Laptop</div>' +
+    '<b style="font-size:0.95rem">This device (host)</b><br>' +
+    '<span style="color:#64748b;font-size:0.8rem">' + formatCoords(userLocation.lat, userLocation.lon) + '</span></div>';
+}
+
+function updateUserLocationMarkers() {
+  if (!userLocation) return;
+  const pos = [userLocation.lat, userLocation.lon];
+  const icon = L.divIcon({
+    html: '<div style="width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 2px rgba(37,99,235,0.45),0 2px 10px rgba(0,0,0,0.3)"></div>',
+    iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+  });
+  [['mini', mapMini], ['main', mapMain]].forEach(([key, mapObj]) => {
+    if (!mapObj) return;
+    if (userLocationMarkers[key]) mapObj.removeLayer(userLocationMarkers[key]);
+    userLocationMarkers[key] = L.marker(pos, { icon, zIndexOffset: 2000 }).addTo(mapObj);
+    userLocationMarkers[key].bindPopup(hostPopupHtml());
+  });
+}
+
+function setGpsBanner(show) {
+  ['map-gps-banner', 'map-mini-gps-banner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? 'block' : 'none';
+  });
+}
+
+function initUserLocation(forcePrompt) {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      userLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy || 50 };
+      setGpsBanner(false);
+      geoCache = {};
+      updateUserLocationMarkers();
+      if (lastData.alerts || lastData.decisions) {
+        const ips = collectIps(lastData.alerts, lastData.decisions);
+        updateMaps(ips, lastData.alerts);
+      }
+    },
+    () => {
+      if (!forcePrompt) setGpsBanner(true);
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+  );
+}
+
+function initMapMini() {
+  if (mapsInitialized.mini) return;
+  mapMini = L.map('map-mini', { ...MAP_OPTS, attributionControl: false }).setView([20, 0], 2);
+  mapLayers.miniStreet = L.tileLayer(TILE_STREET.url, TILE_STREET.opts);
+  mapLayers.miniSat = L.tileLayer(TILE_SAT.url, TILE_SAT.opts);
+  mapLayers.miniStreet.addTo(mapMini);
+  addMapControls(mapMini, 'mini');
+  mapsInitialized.mini = true;
+  if (userLocation) updateUserLocationMarkers();
+}
+
+function initMapMain() {
+  if (mapsInitialized.main) return;
+  mapMain = L.map('map-main', { ...MAP_OPTS, attributionControl: false }).setView([20, 0], 2);
+  mapLayers.mainStreet = L.tileLayer(TILE_STREET.url, TILE_STREET.opts);
+  mapLayers.mainSat = L.tileLayer(TILE_SAT.url, TILE_SAT.opts);
+  mapLayers.mainStreet.addTo(mapMain);
+  addMapControls(mapMain, 'main');
+  mapsInitialized.main = true;
+  if (userLocation) updateUserLocationMarkers();
+}
+
+const chartFont = { family: FONT, size: 11 };
+const gridColor = 'rgba(226,232,240,0.9)';
+
+function initCharts() {
+  Chart.defaults.font.family = FONT;
+  Chart.defaults.color = '#64748b';
+
+  barChart = new Chart(document.getElementById('chart-bar'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: '#3b82f6', borderRadius: 8, barThickness: 22 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false }, ticks: { font: chartFont } }, y: { grid: { color: gridColor }, ticks: { font: chartFont }, beginAtZero: true } } }
+  });
+
+  lineChart = new Chart(document.getElementById('chart-line'), {
+    type: 'line',
+    data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', backgroundColor: ctx => {
+      const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 220);
+      g.addColorStop(0, 'rgba(59,130,246,0.25)'); g.addColorStop(1, 'rgba(59,130,246,0)');
+      return g;
+    }, fill: true, tension: 0.42, pointRadius: 0, pointHoverRadius: 5, borderWidth: 2.5 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false }, ticks: { font: chartFont, maxTicksLimit: 8 } }, y: { grid: { color: gridColor }, ticks: { font: chartFont }, beginAtZero: true } },
+      interaction: { intersect: false, mode: 'index' } }
+  });
+
+  gaugeChart = new Chart(document.getElementById('chart-gauge'), {
+    type: 'doughnut',
+    data: { datasets: [{ data: [25,25,25,25], backgroundColor: ['#10b981','#fbbf24','#f97316','#ef4444'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: '78%', plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+  });
+
+  doughnutChart = new Chart(document.getElementById('chart-doughnut'), {
+    type: 'doughnut',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3b82f6','#6366f1','#8b5cf6','#f59e0b','#ef4444','#10b981'], borderWidth: 0, hoverOffset: 8 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { font: chartFont, padding: 14, usePointStyle: true } } } }
+  });
+
+  hbarChart = new Chart(document.getElementById('chart-hbar'), {
+    type: 'bar',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: '#6366f1', borderRadius: 6 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { color: gridColor }, ticks: { font: chartFont }, beginAtZero: true }, y: { grid: { display: false }, ticks: { font: chartFont } } } }
+  });
+}
+
+function shortScenario(s) {
+  return (s || '').replace('crowdsecurity/', '').replace('cybersec/', '').replace(/-/g, ' ').trim() || 'unknown';
+}
+
+function ensureArray(data) {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'object') return [data];
+  return [];
+}
+
+function alertIp(a) {
+  if (a.source && a.source.ip) return a.source.ip;
+  if (a.source && a.source.value) return a.source.value;
+  const d = (a.decisions && a.decisions[0]) || {};
+  return d.value || null;
+}
+
+function collectIps(alerts, decisions) {
+  const set = new Set();
+  decisions.forEach(d => { if (d.value) set.add(d.value); });
+  alerts.forEach(a => { const ip = alertIp(a); if (ip) set.add(ip); });
+  return [...set];
+}
+
+function formatCoords(lat, lon) {
+  if (lat == null || lon == null) return '';
+  return lat.toFixed(5) + ', ' + lon.toFixed(5);
+}
+
+async function geoLookup(ip) {
+  if (geoCache[ip]) return geoCache[ip];
+  try {
+    let url = '/api/geo?ip=' + encodeURIComponent(ip);
+    if (userLocation) {
+      url += '&ulat=' + userLocation.lat + '&ulon=' + userLocation.lon + '&uacc=' + (userLocation.accuracy || 0);
+    }
+    const g = await fetch(url).then(r => r.json());
+    if (g.error) throw new Error(g.error);
+    geoCache[ip] = {
+      lat: g.lat, lon: g.lon, city: g.city, region: g.region || '',
+      country: g.country, zip: g.zip || '', isp: g.isp || '', org: g.org || '',
+      subnet: g.subnet || '', accuracy: g.accuracy || '', source: g.source || '',
+      road: g.road || '', suburb: g.suburb || '',
+      flag: g.isPrivate ? '🏠' : flagEmoji(g.countryCode),
+      isPrivate: !!g.isPrivate, label: g.label || (g.city + ', ' + g.country)
+    };
+  } catch {
+    geoCache[ip] = { lat: 20.59, lon: 78.96, city: 'Unknown', country: '?', flag: '🌐', label: 'Location unavailable', zip: '', isp: '', accuracy: '', source: '' };
+  }
+  return geoCache[ip];
+}
+
+function flagEmoji(code) {
+  if (!code) return '🌐';
+  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+function buildPopupHtml(ip, geo, count) {
+  const coords = formatCoords(geo.lat, geo.lon);
+  const role = geo.isPrivate && geo.source === 'gps'
+    ? 'Attacker (same WiFi as your laptop)'
+    : geo.isPrivate ? 'Attacker (local network)' : 'Attacker (remote)';
+  const loc = geo.isPrivate
+    ? (geo.subnet ? 'Subnet ' + geo.subnet : 'Local network device')
+    : [geo.city, geo.region, geo.country].filter(Boolean).join(', ') + (geo.zip ? ' ' + geo.zip : '');
+  const extra = [
+    coords ? coords : '',
+    geo.isp ? geo.isp : '',
+    geo.accuracy ? '<span style="color:#94a3b8;font-size:0.72rem">' + geo.accuracy + '</span>' : ''
+  ].filter(Boolean).join('<br>');
+  return '<div style="min-width:200px;line-height:1.45">' +
+    '<div style="font-size:0.65rem;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.05em">Attacker IP</div>' +
+    '<b style="color:#ef4444;font-size:0.95rem">' + ip + '</b><br>' +
+    '<span style="font-weight:600;color:#1e293b">' + role + '</span><br>' +
+    '<span style="color:#64748b">' + loc + '</span><br>' +
+    (extra ? extra + '<br>' : '') +
+    '<span style="color:#64748b;margin-top:4px;display:inline-block">' + count + ' alert(s) - BANNED</span></div>';
+}
+
+function setPin(mapObj, store, ip, geo, count) {
+  if (store[ip]) mapObj.removeLayer(store[ip]);
+  const col = count >= 3 ? '#ef4444' : count >= 2 ? '#f59e0b' : '#3b82f6';
+  const icon = L.divIcon({
+    html: '<div style="position:relative;width:22px;height:22px">' +
+      '<div style="position:absolute;inset:0;border-radius:50%;background:' + col + ';opacity:0.35;animation:pinPulse 1.8s ease-out infinite"></div>' +
+      '<div style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:' + col + ';border:2.5px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.35)"></div></div>',
+    iconSize: [22, 22], iconAnchor: [11, 11], className: ''
+  });
+  const m = L.marker([geo.lat, geo.lon], { icon }).addTo(mapObj);
+  m.bindPopup(buildPopupHtml(ip, geo, count));
+  store[ip] = m;
+}
+
+function parsePrometheus(raw) {
+  const r = { activeBans: 0, activeAlerts: {}, bucketsCreated: 0, bucketsOverflow: 0, eventsPoured: 0, parserHits: 0, goroutines: 0, uptime: 0 };
+  raw.split('\n').forEach(line => {
+    let m;
+    if ((m = line.match(/^cs_active_decisions\{.*?\}\s+([\d.]+)/))) r.activeBans += +m[1];
+    if ((m = line.match(/^cs_alerts\{reason="([^"]+)"\}\s+([\d.]+)/))) r.activeAlerts[m[1]] = +m[2];
+    if ((m = line.match(/^cs_bucket_instantiation_total\{.*?\}\s+([\d.]+)/))) r.bucketsCreated += +m[1];
+    if ((m = line.match(/^cs_bucket_overflowed_total\{.*?\}\s+([\d.]+)/))) r.bucketsOverflow += +m[1];
+    if ((m = line.match(/^cs_bucket_poured_total\{.*?\}\s+([\d.]+)/))) r.eventsPoured += +m[1];
+    if ((m = line.match(/^cs_parser_hits_total\{.*?\}\s+([\d.]+)/))) r.parserHits += +m[1];
+    if ((m = line.match(/^go_goroutines\s+([\d.]+)/))) r.goroutines = +m[1];
+  });
+  return r;
+}
+
+async function blockIp() {
+  const ip = document.getElementById('block-ip').value.trim();
+  const duration = document.getElementById('block-duration').value;
+  if (!ip) { toast('Enter an IP address', false); return; }
+  try {
+    const r = await fetch('/api/block', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip, duration }) });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    toast('Blocked ' + ip + ' for ' + duration);
+    document.getElementById('block-ip').value = '';
+    loadAll();
+  } catch (e) { toast('Block failed: ' + e.message, false); }
+}
+
+async function unbanIp(ip) {
+  if (!confirm(
+    'Globally unblock ' + ip + '?\n\n' +
+    'This will:\n' +
+    '• Remove ALL ban decisions from the engine\n' +
+    '• Delete the Windows Firewall block rule\n\n' +
+    'The remote device can attack again immediately.'
+  )) return;
+
+  const resultEl = document.getElementById('unban-result');
+  if (resultEl) { resultEl.className = ''; resultEl.style.display = 'none'; }
+
+  try {
+    const r = await fetch('/api/unban', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    if (resultEl) {
+      resultEl.textContent = d.message || ('Unblocked ' + ip);
+      resultEl.className = d.ok ? 'ok' : 'err';
+    }
+    toast(d.ok ? ('Globally unblocked ' + ip + ' — attack allowed again') : ('Unblock incomplete for ' + ip), !!d.ok);
+    loadAll();
+  } catch (e) {
+    if (resultEl) { resultEl.textContent = 'Unblock failed: ' + e.message; resultEl.className = 'err'; }
+    toast('Unblock failed: ' + e.message, false);
+  }
+}
+
+function statusTag(on, yesLabel, noLabel) {
+  return on
+    ? '<span class="tag tag-ban">' + yesLabel + '</span>'
+    : '<span class="tag tag-ok">' + noLabel + '</span>';
+}
+
+function renderBansTable(bansList) {
+  const bans = Array.isArray(bansList) ? bansList : [];
+  if (!bans.length) return '<div class="empty">No active bans — all IPs can connect</div>';
+  let h = '<table><thead><tr><th>IP Address</th><th>Scenario</th><th>Expires</th><th>Engine</th><th>Firewall</th><th>Action</th></tr></thead><tbody>';
+  bans.forEach(b => {
+    const ip = b.ip || b.value;
+    h += '<tr><td><span class="ip-mono">' + ip + '</span></td>';
+    h += '<td><span class="tag tag-warn">' + shortScenario(b.scenario) + '</span></td>';
+    h += '<td>' + (b.duration || '—') + '</td>';
+    h += '<td>' + statusTag(b.engineBanned !== false, 'Banned', 'Clear') + '</td>';
+    h += '<td>' + statusTag(b.firewallBlocked, 'Blocked', 'Open') + '</td>';
+    h += '<td><button class="btn btn-success btn-sm" onclick="unbanIp(\'' + ip + '\')"><i data-lucide="unlock"></i> Global Unblock</button></td>';
+    h += '</tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+function renderTxList(alerts, decisions, full) {
+  const items = [];
+  decisions.filter(d => d.type === 'ban').forEach(d => {
+    items.push({ type: 'ban', name: d.value, sub: shortScenario(d.scenario), time: 'Banned · ' + (d.duration || ''), badge: 'BLOCKED', cls: 'red' });
+  });
+  const limit = full ? 50 : 12;
+  alerts.slice(0, limit).forEach(a => {
+    const ip = alertIp(a) || 'Unknown';
+    items.push({ type: 'alert', name: ip, sub: shortScenario(a.scenario),
+      time: a.created_at ? new Date(a.created_at).toLocaleString() : '—',
+      badge: (a.events_count || 1) + ' evt', cls: 'amber' });
+  });
+  if (!items.length) return '<div class="empty">No incidents yet</div>';
+  const icons = { ban: 'shield-off', alert: 'alert-triangle' };
+  return items.map(it => {
+    const unblockBtn = it.type === 'ban'
+      ? '<button class="btn btn-success btn-sm" style="margin-left:8px" onclick="unbanIp(\'' + it.name + '\')"><i data-lucide="unlock"></i></button>'
+      : '';
+    return `
+    <div class="tx-item">
+      <div class="tx-icon ${it.type}"><i data-lucide="${icons[it.type] || 'activity'}"></i></div>
+      <div class="tx-info"><div class="tx-name">${it.name}</div><div class="tx-sub">${it.sub} · ${it.time}</div></div>
+      <div style="display:flex;align-items:center">${unblockBtn}<span class="tx-badge ${it.cls}">${it.badge}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderMetrics(m) {
+  if (!m || m.error) return '<div class="empty">Metrics unavailable</div>';
+  const rows = [
+    { l: 'Events Poured', v: m.eventsPoured || 0 }, { l: 'Parser Hits', v: m.parserHits || 0 },
+    { l: 'Buckets Created', v: m.bucketsCreated || 0 }, { l: 'Buckets Overflowed', v: m.bucketsOverflow || 0 },
+    { l: 'Active Bans', v: m.activeBans || 0 }, { l: 'Goroutines', v: m.goroutines || 0 }
+  ];
+  const max = Math.max(...rows.map(r => r.v), 1);
+  return rows.map(r => {
+    const pct = Math.min(100, (r.v / max) * 100);
+    return '<div class="metric-row"><div class="metric-lbl">' + r.l + '</div><div class="metric-track"><div class="metric-fill" style="width:' + pct + '%"></div></div><div class="metric-val">' + Math.round(r.v) + '</div></div>';
+  }).join('');
+}
+
+function renderFeatures(endpoints) {
+  const eps = Array.isArray(endpoints) ? endpoints : [];
+  if (!eps.length) {
+    return '<div class="empty">No endpoints registered — run enterprise\\agent\\scripts\\enroll-org.ps1 on each laptop</div>';
+  }
+  return eps.map(ep => {
+    const on = ep.status === 'online';
+    const deg = ep.status === 'degraded';
+    const bg = on ? 'var(--success-soft)' : (deg ? 'var(--danger-soft)' : '#f1f5f9');
+    const col = on ? 'var(--success)' : (deg ? 'var(--danger)' : 'var(--muted)');
+    const icon = on ? '●' : (deg ? '◐' : '○');
+    return '<div style="background:' + bg + ';border-radius:14px;padding:16px;cursor:pointer" onclick="showEndpointDetail(\'' + ep.id + '\')">' +
+      '<div style="font-weight:700;font-size:0.85rem;color:' + col + '">' + icon + ' ' + esc(ep.hostname || 'endpoint') + '</div>' +
+      '<div style="font-size:0.75rem;color:var(--muted);margin-top:4px">' +
+      (ep.department || '—') + ' · ' + (ep.status || 'unknown') + ' · Engine: ' + (ep.engine_status || '—') +
+      '</div></div>';
+  }).join('');
+}
+
+function renderIncidentsList(incidents) {
+  const list = incidents || [];
+  if (!list.length) return '<div class="empty">No correlated incidents in last 24h</div>';
+  return list.map(inc => `
+    <div class="tx-item">
+      <div class="tx-icon alert"><i data-lucide="alert-triangle"></i></div>
+      <div class="tx-info">
+        <div class="tx-name">${esc(inc.source_ip)}</div>
+        <div class="tx-sub">${esc(shortScenario(inc.scenario))} · ${inc.count} events · ${inc.affected_agents} endpoint(s)</div>
+      </div>
+      <span class="tx-badge amber">${esc(inc.max_severity || 'medium')}</span>
+    </div>`).join('');
+}
+
+async function showEndpointDetail(id) {
+  showPage('engine');
+  const card = document.getElementById('fleet-detail-card');
+  const body = document.getElementById('fleet-detail-body');
+  card.style.display = 'block';
+  body.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const d = await fetch('/api/endpoints/' + encodeURIComponent(id)).then(r => r.json());
+    const alerts = d.recent_alerts || [];
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div><strong>Hostname</strong><br>${esc(d.hostname)}</div>
+        <div><strong>Department</strong><br>${esc(d.department || '—')}</div>
+        <div><strong>Status</strong><br>${esc(d.status)} · ${esc(d.health || '')}</div>
+        <div><strong>Engine</strong><br>${esc(d.engine_status || '—')}</div>
+        <div><strong>Public IP</strong><br>${esc(d.public_ip || '—')}</div>
+        <div><strong>Local IP</strong><br>${esc(d.local_ip || '—')}</div>
+        <div><strong>CPU / RAM / Disk</strong><br>${d.cpu_percent || 0}% / ${d.ram_percent || 0}% / ${d.disk_percent || 0}%</div>
+        <div><strong>Last seen</strong><br>${d.last_seen_at ? new Date(d.last_seen_at).toLocaleString() : '—'}</div>
+      </div>
+      <div class="card-title" style="font-size:0.9rem;margin-bottom:8px">Recent Alerts (${alerts.length})</div>
+      ${alerts.length ? renderTxList(alerts.map(a => ({ scenario: a.scenario, source: { ip: a.source_ip }, created_at: a.detected_at, events_count: 1 })), [], true) : '<div class="empty">No alerts for this endpoint</div>'}`;
+    refreshIcons();
+  } catch (e) {
+    body.innerHTML = '<div class="empty">Failed to load: ' + esc(e.message) + '</div>';
+  }
+}
+
+let alertSocket = null;
+function connectAlertWS() {
+  fetch('/api/ws-token').then(r => r.ok ? r.json() : null).then(cfg => {
+    if (!cfg || !cfg.token) return;
+    const url = (cfg.ws_url || 'ws://127.0.0.1:8443/ws/v1/alerts') + '?token=' + encodeURIComponent(cfg.token);
+    try {
+      if (alertSocket) alertSocket.close();
+      alertSocket = new WebSocket(url);
+      alertSocket.onmessage = () => { loadAll(); showToast('New fleet alert received'); };
+      alertSocket.onclose = () => setTimeout(connectAlertWS, 5000);
+    } catch (_) {}
+  }).catch(() => setTimeout(connectAlertWS, 8000));
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 4000);
+}
+function esc(s) { if (s == null) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+let fleetEndpoints = [];
+
+function renderMapSidebar(list) {
+  let html = '';
+  if (userLocation) {
+    html += `
+    <div class="map-ip-item" onclick="focusHost()">
+      <div class="map-ip-flag">💻</div>
+      <div class="map-ip-info">
+        <div class="map-ip-role host">Your Laptop</div>
+        <div class="map-ip-addr">This device (host)</div>
+        <div class="map-ip-loc">${formatCoords(userLocation.lat, userLocation.lon)}</div>
+      </div>
+    </div>`;
+  }
+  if (!list.length && !userLocation) return '<div class="empty">No IPs located</div>';
+  html += list.map(item => `
+    <div class="map-ip-item" onclick="focusIp('${item.ip}')">
+      <div class="map-ip-flag">${item.geo.flag || '🌐'}</div>
+      <div class="map-ip-info">
+        <div class="map-ip-role">Attacker</div>
+        <div class="map-ip-addr">${item.ip}</div>
+        <div class="map-ip-loc">${item.geo.isPrivate && item.geo.source === 'gps' ? 'Same WiFi - ' : ''}${item.geo.label || item.geo.city + ', ' + item.geo.country}</div>
+        <div class="map-ip-loc" style="font-size:0.72rem;margin-top:2px;color:var(--muted)">${formatCoords(item.geo.lat, item.geo.lon)}${item.geo.subnet ? ' - ' + item.geo.subnet : ''} - ${item.count} alert(s)</div>
+      </div>
+    </div>`).join('');
+  return html || '<div class="empty">No attacker IPs yet</div>';
+}
+
+function focusHost() {
+  if (!userLocation || !mapMain) return;
+  showPage('map');
+  setTimeout(() => {
+    mapUserControlled.main = true;
+    mapMain.flyTo([userLocation.lat, userLocation.lon], 18, { duration: 0.6 });
+    if (userLocationMarkers.main) userLocationMarkers.main.openPopup();
+  }, 300);
+}
+
+function fitMapToIps(map, list, isMini) {
+  const points = list.map(x => [x.geo.lat, x.geo.lon]);
+  if (userLocation) points.push([userLocation.lat, userLocation.lon]);
+  if (!points.length) return;
+  if (points.length === 1) {
+    map.setView(points[0], isMini ? 15 : 17);
+  } else {
+    const bounds = L.latLngBounds(points);
+    map.fitBounds(bounds.pad(0.2), { maxZoom: isMini ? 15 : 17, animate: false });
+  }
+}
+
+function mapZoomFor(geo) {
+  if (geo.source === 'gps') return 18;
+  if (geo.isPrivate) return 16;
+  return 14;
+}
+
+function focusIp(ip) {
+  const item = ipGeoList.find(x => x.ip === ip);
+  if (!item || !mapMain) return;
+  showPage('map');
+  setTimeout(() => {
+    mapUserControlled.main = true;
+    mapMain.flyTo([item.geo.lat, item.geo.lon], mapZoomFor(item.geo), { duration: 0.6 });
+    if (mapMarkers.main[ip]) mapMarkers.main[ip].openPopup();
+  }, 300);
+}
+
+function updateCharts(metrics, alerts, bans) {
+  const scenarioData = metrics.activeAlerts || {};
+  const fromAlerts = {};
+  alerts.forEach(a => { const k = shortScenario(a.scenario); fromAlerts[k] = (fromAlerts[k] || 0) + 1; });
+  const merged = { ...fromAlerts };
+  Object.entries(scenarioData).forEach(([k,v]) => { merged[shortScenario(k)] = (merged[shortScenario(k)] || 0) + v; });
+  const sorted = Object.entries(merged).sort((a,b) => b[1]-a[1]).slice(0, 8);
+
+  barChart.data.labels = sorted.map(([k]) => k.length > 14 ? k.slice(0,14)+'…' : k);
+  barChart.data.datasets[0].data = sorted.map(([,v]) => v);
+  barChart.update('none');
+
+  doughnutChart.data.labels = sorted.map(([k]) => k);
+  doughnutChart.data.datasets[0].data = sorted.map(([,v]) => v);
+  doughnutChart.update('none');
+
+  hbarChart.data.labels = sorted.map(([k]) => k.length > 20 ? k.slice(0,20)+'…' : k);
+  hbarChart.data.datasets[0].data = sorted.map(([,v]) => v);
+  hbarChart.update('none');
+
+  const now = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  trafficHistory.push({ t: now, v: metrics.eventsPoured || alerts.length });
+  if (trafficHistory.length > MAX_TRAFFIC) trafficHistory.shift();
+  lineChart.data.labels = trafficHistory.map(x => x.t);
+  lineChart.data.datasets[0].data = trafficHistory.map(x => x.v);
+  lineChart.update('none');
+
+  const score = Math.max(0, Math.min(100, 100 - bans * 15 - alerts.length * 2 - (metrics.bucketsOverflow || 0) * 5));
+  document.getElementById('gauge-score').textContent = score;
+  const labels = ['Excellent','Good','Moderate','Critical'];
+  const idx = score >= 80 ? 0 : score >= 60 ? 1 : score >= 40 ? 2 : 3;
+  document.getElementById('gauge-label').textContent = labels[idx];
+  document.getElementById('gauge-label').style.color = idx <= 1 ? 'var(--success)' : idx === 2 ? 'var(--warn)' : 'var(--danger)';
+  gaugeChart.data.datasets[0].backgroundColor = ['#e2e8f0','#e2e8f0','#e2e8f0','#e2e8f0'];
+  gaugeChart.data.datasets[0].backgroundColor[idx] = idx <= 1 ? '#10b981' : idx === 2 ? '#fbbf24' : '#ef4444';
+  gaugeChart.update('none');
+}
+
+async function updateMaps(uniqueIps, alerts) {
+  initMapMini();
+  const ipKey = [...uniqueIps].sort().join('|');
+  const ipsChanged = ipKey !== lastIpKey;
+  lastIpKey = ipKey;
+
+  const currentSet = new Set(uniqueIps);
+  Object.keys(mapMarkers.mini).forEach(ip => {
+    if (!currentSet.has(ip)) {
+      mapMini.removeLayer(mapMarkers.mini[ip]);
+      delete mapMarkers.mini[ip];
+      delete geoCache[ip];
+    }
+  });
+  if (mapsInitialized.main) {
+    Object.keys(mapMarkers.main).forEach(ip => {
+      if (!currentSet.has(ip)) {
+        mapMain.removeLayer(mapMarkers.main[ip]);
+        delete mapMarkers.main[ip];
+        delete geoCache[ip];
+      }
+    });
+  }
+
+  ipGeoList = [];
+  for (const ip of uniqueIps.slice(0, 20)) {
+    const geo = await geoLookup(ip);
+    const count = alerts.filter(a => alertIp(a) === ip).length || 1;
+    ipGeoList.push({ ip, geo, count });
+    setPin(mapMini, mapMarkers.mini, ip, geo, count);
+    if (mapsInitialized.main) setPin(mapMain, mapMarkers.main, ip, geo, count);
+  }
+
+  updateUserLocationMarkers();
+
+  const shouldFitMini = (ipGeoList.length || userLocation) && (ipsChanged || !mapInitialFit.mini);
+  const shouldFitMain = (ipGeoList.length || userLocation) && mapsInitialized.main && (ipsChanged || !mapInitialFit.main);
+  if (shouldFitMini && !mapUserControlled.mini) {
+    fitMapToIps(mapMini, ipGeoList, true);
+    mapInitialFit.mini = true;
+  }
+  if (shouldFitMain && !mapUserControlled.main) {
+    fitMapToIps(mapMain, ipGeoList, false);
+    mapInitialFit.main = true;
+  }
+
+  const meta = ipGeoList.length + ' attacker(s)' + (userLocation ? ' + your laptop' : '');
+  document.getElementById('map-mini-meta').textContent = meta;
+  document.getElementById('map-main-meta').textContent = meta;
+  document.getElementById('map-sidebar').innerHTML = renderMapSidebar(ipGeoList);
+}
+
+async function loadAll() {
+  try {
+    const [alertsRes, decisionsRes, bansRes, metricsRaw, healthRes, endpointsRes, incidentsRes] = await Promise.all([
+      fetch('/api/alerts').then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch('/api/decisions').then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch('/api/bans').then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch('/api/metrics').then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/health').then(r => r.json()).catch(() => ({ status: 'offline' })),
+      fetch('/api/endpoints').then(r => r.ok ? r.json() : { endpoints: [] }).catch(() => ({ endpoints: [] })),
+      fetch('/api/incidents').then(r => r.ok ? r.json() : { incidents: [] }).catch(() => ({ incidents: [] }))
+    ]);
+    const online = healthRes.status === 'ok';
+    let metricsRes = metricsRaw;
+    if (online && (!metricsRes || metricsRes.error)) {
+      metricsRes = metricsRes || {};
+    }
+    metricsRes = metricsRes || {};
+
+    document.getElementById('status-dot').classList.toggle('off', !online);
+    document.getElementById('status-text').textContent = online ? 'Manager Live' : 'Offline';
+
+    const alertbar = document.getElementById('alertbar');
+    if (!online) {
+      alertbar.style.display = 'block';
+      alertbar.textContent = 'Manager offline — run: cd enterprise/manager && go run ./cmd/manager';
+    } else {
+      alertbar.style.display = 'none';
+    }
+
+    const alerts = ensureArray(alertsRes);
+    const decisions = ensureArray(decisionsRes);
+    const bans = decisions.filter(d => d.type === 'ban');
+    if (!online) {
+      document.getElementById('hero-bans').textContent = '0 Active Bans';
+      document.getElementById('hero-sub').innerHTML = '<span class="dot off"></span> Manager offline';
+      document.getElementById('s-alerts').textContent = '0';
+      document.getElementById('s-ips').textContent = '0';
+      document.getElementById('s-events').textContent = '—';
+      return;
+    }
+    let bansList = ensureArray(bansRes);
+    if (!bansList.length && bans.length) {
+      const seen = new Set();
+      bansList = bans.filter(d => {
+        if (seen.has(d.value)) return false;
+        seen.add(d.value);
+        return true;
+      }).map(d => ({ ip: d.value, scenario: d.scenario, duration: d.duration, engineBanned: true, firewallBlocked: true }));
+    }
+    const uniqueIps = collectIps(alerts, decisions);
+    lastData = { alerts, decisions, metrics: metricsRes };
+
+    if (alerts.length === 0 && bans.length === 0) {
+      trafficHistory = [];
+      geoCache = {};
+      lastIpKey = '';
+      mapInitialFit = { mini: false, main: false };
+      Object.keys(mapMarkers.mini).forEach(ip => { if (mapMini) mapMini.removeLayer(mapMarkers.mini[ip]); delete mapMarkers.mini[ip]; });
+      if (mapMain) Object.keys(mapMarkers.main).forEach(ip => { mapMain.removeLayer(mapMarkers.main[ip]); delete mapMarkers.main[ip]; });
+      ipGeoList = [];
+    }
+
+    document.getElementById('hero-bans').textContent = bans.length + ' Active Ban' + (bans.length !== 1 ? 's' : '');
+    const fleetOnline = metricsRes.onlineAgents != null ? metricsRes.onlineAgents : '—';
+    const fleetTotal = metricsRes.parserHits != null ? Math.round(metricsRes.parserHits) : '—';
+    document.getElementById('hero-sub').innerHTML = '<span class="dot"></span> Fleet ' + fleetOnline + '/' + fleetTotal + ' online · ' + alerts.length + ' alerts';
+    document.getElementById('s-alerts').textContent = alerts.length;
+    document.getElementById('s-ips').textContent = uniqueIps.length;
+    document.getElementById('s-events').textContent = metricsRes.eventsPoured ? Math.round(metricsRes.eventsPoured) : '—';
+
+    document.getElementById('tx-list').innerHTML = renderTxList(alerts, decisions, false);
+    const incidents = incidentsRes.incidents || [];
+    document.getElementById('incidents-full').innerHTML = incidents.length ? renderIncidentsList(incidents) : renderTxList(alerts, decisions, true);
+    document.getElementById('tx-count').textContent = (bans.length + alerts.length) + ' total';
+    document.getElementById('inc-meta').textContent = (incidents.length || bans.length + alerts.length) + ' incidents';
+
+    document.getElementById('bans-page-table').innerHTML = renderBansTable(bansList);
+    document.getElementById('bans-page-meta').textContent = bansList.length + ' IP(s) blocked';
+
+    document.getElementById('metrics-bars').innerHTML = renderMetrics(metricsRes);
+    fleetEndpoints = endpointsRes.endpoints || [];
+    document.getElementById('features-grid').innerHTML = renderFeatures(fleetEndpoints);
+    const fs = document.getElementById('fleet-summary');
+    if (metricsRes.byStatus) {
+      fs.textContent = Object.entries(metricsRes.byStatus).map(([k,v]) => k + ': ' + v).join(' · ');
+    } else {
+      fs.textContent = fleetEndpoints.length + ' endpoint(s) enrolled';
+    }
+
+    document.getElementById('a-events').textContent = metricsRes.eventsPoured ? Math.round(metricsRes.eventsPoured) : '—';
+    document.getElementById('a-overflow').textContent = metricsRes.bucketsOverflow ? Math.round(metricsRes.bucketsOverflow) : '—';
+    document.getElementById('a-parser').textContent = metricsRes.parserHits ? Math.round(metricsRes.parserHits) : '—';
+
+    updateCharts(metricsRes, alerts, bans.length);
+    await updateMaps(uniqueIps, alerts);
+
+    const q = (document.getElementById('search-input').value || '').toLowerCase();
+    if (q) document.querySelectorAll('.tx-item').forEach(el => {
+      el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+
+    refreshIcons();
+  } catch (e) {
+    document.getElementById('alertbar').style.display = 'block';
+    document.getElementById('alertbar').textContent = 'Error: ' + e.message;
+  }
+}
+
+document.getElementById('search-input').addEventListener('input', () => {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  document.querySelectorAll('.tx-item,.map-ip-item').forEach(el => {
+    el.style.display = !q || el.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+initMapMini();
+initCharts();
+initUserLocation(false);
+refreshIcons();
+loadAll();
+connectAlertWS();
+setInterval(loadAll, 3000);
+</script>
+</body>
+</html>
