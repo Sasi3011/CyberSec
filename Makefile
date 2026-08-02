@@ -427,9 +427,6 @@ package:
 
 	@$(CPR) ./config $(RELDIR)
 	@$(CP) wizard.sh $(RELDIR)
-	@$(CP) scripts/test_env.sh $(RELDIR)
-	@$(CP) scripts/test_env.ps1 $(RELDIR)
-
 	@tar cvzf crowdsec-release.tgz $(RELDIR)
 
 .PHONY: check_release
