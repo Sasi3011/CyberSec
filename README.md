@@ -22,7 +22,7 @@ cd C:\Users\Sasikiran\Documents\crowdsec
 
 ## Two-Device Attack Demo
 
-See **[ATTACK-DEMO.md](ATTACK-DEMO.md)** for the full step-by-step guide.
+See **[CODEBASE.md](CODEBASE.md#path-b-two-device-attack-demo-15-minutes)** for the full step-by-step guide.
 
 | Host | Remote device (copy `run.ps1` only) |
 |------|-------------------------------------|
@@ -52,12 +52,27 @@ Remote attack  →  Honeypot :9999  →  attack.log  →  Engine  →  Ban  → 
                                               Dashboard :3000 + Prometheus :6060
 ```
 
-## Documentation
+## Enterprise EDR/XDR Platform
 
-- **[ATTACK-DEMO.md](ATTACK-DEMO.md)** — Two-device automatic attack demo
-- **[instruction.md](instruction.md)** — Full project reference
+Multi-endpoint fleet protection built **on top of** the existing engine — local `run.ps1 start` is unchanged.
 
-## License
+| Layer | Location |
+|-------|----------|
+| Central Manager | `enterprise/manager/` |
+| Windows Agent | `enterprise/agent/` |
+| SOC Dashboard | `enterprise/dashboard/` |
 
-Based on CyberSec (MIT License). See upstream project for full license terms.
+```powershell
+# Existing single-host demo (unchanged):
+.\scripts\run.ps1 start
+
+# Enterprise stack (local dev):
+cd enterprise\manager
+go run ./cmd/manager
+
+# SOC dashboard (separate terminal):
+.\scripts\run.ps1 soc
+```
+
+See **[CODEBASE.md](CODEBASE.md)** for full architecture, features, API, and operations.
 
