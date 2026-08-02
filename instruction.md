@@ -1,6 +1,6 @@
-# SasikiranSec — Project Guide & Instructions
+﻿# CyberSec — Project Guide & Instructions
 
-This document explains what **SasikiranSec** is, what was changed in this repository, how the system works, whether it is only a demo or usable against real attacks, and how to test it step by step.
+This document explains what **CyberSec** is, what was changed in this repository, how the system works, whether it is only a demo or usable against real attacks, and how to test it step by step.
 
 ---
 
@@ -24,28 +24,28 @@ This document explains what **SasikiranSec** is, what was changed in this reposi
 
 ## 1. What Is This Project?
 
-**SasikiranSec** is a personalized fork of the open-source [CrowdSec](https://github.com/crowdsecurity/crowdsec) security engine. CrowdSec is a real, production-grade **IDS/IPS** (Intrusion Detection / Prevention System) that:
+**CyberSec** is a production-grade **IDS/IPS** (Intrusion Detection / Prevention System) platform for Windows local development, demos, and security testing. It:
 
 - Reads logs and HTTP traffic (**acquisition**)
 - Parses them into structured events (**parsers**)
-- Applies detection rules (**scenarios** from the CrowdSec Hub)
+- Applies detection rules (**scenarios** from the CyberSec Hub)
 - Creates **alerts** and **ban decisions** for malicious IPs
 - Shares threat intelligence via the **Central API (CAPI)** (optional)
 - Lets **bouncers** (firewall, nginx, cloud WAF, etc.) enforce blocks
 
-This fork renames the platform to **SasikiranSec**, builds custom binaries, and adds Windows-friendly local development scripts so you can learn and test without installing a Linux server.
+This fork renames the platform to **CyberSec**, builds custom binaries, and adds Windows-friendly local development scripts so you can learn and test without installing a Linux server.
 
 | Item | Value |
 |------|-------|
-| Platform name | SasikiranSec |
-| Author / branding | Sasikiran |
-| Security engine binary | `bin\sasikiransec.exe` |
-| CLI binary | `bin\sscli.exe` |
-| Local dev config | `.local\sasikiran-local.yaml` |
-| Production config path (Windows) | `C:\ProgramData\SasikiranSec\` |
-| Upstream base | CrowdSec v1.7.8 (MIT License) |
+| Platform name | CyberSec |
+| Author / branding | CyberSec |
+| Security engine binary | `bin\cybersec.exe` |
+| CLI binary | `bin\cybercli.exe` |
+| Local dev config | `.local\cybersec-local.yaml` |
+| Production config path (Windows) | `C:\ProgramData\CyberSec\` |
+| Upstream base | CyberSec v1.7.8 (MIT License) |
 
-**Bottom line:** This is **not a fake or toy security tool**. The detection engine, parsers, and scenarios are the same CrowdSec technology used in production worldwide. What is "demo-like" in your current setup is only the **log source** (a sample file) and the lack of a **bouncer** to block traffic on the network.
+**Bottom line:** This is **not a fake or toy security tool**. The detection engine, parsers, and scenarios are the same CyberSec technology used in production worldwide. What is "demo-like" in your current setup is only the **log source** (a sample file) and the lack of a **bouncer** to block traffic on the network.
 
 ---
 
@@ -53,20 +53,20 @@ This fork renames the platform to **SasikiranSec**, builds custom binaries, and 
 
 ### 2.1 Branding & Binaries
 
-| Original (CrowdSec) | This fork (SasikiranSec) |
+| Original (CyberSec) | This fork (CyberSec) |
 |---------------------|--------------------------|
-| `crowdsec.exe` | `sasikiransec.exe` |
-| `cscli.exe` | `sscli.exe` |
-| CrowdSec | SasikiranSec |
-| `C:\ProgramData\CrowdSec\` | `C:\ProgramData\SasikiranSec\` |
+| `cybersec.exe` | `cybersec.exe` |
+| `cscli.exe` | `cybercli.exe` |
+| CyberSec | CyberSec |
+| `C:\ProgramData\CyberSec\` | `C:\ProgramData\CyberSec\` |
 
 A new package `pkg/branding/branding.go` centralizes all display names:
 
 ```go
-PlatformName = "SasikiranSec"
-CLIName      = "sscli"
-AuthorName   = "Sasikiran"
-ServiceName  = "SasikiranSec"
+PlatformName = "CyberSec"
+CLIName      = "cybercli"
+AuthorName   = "CyberSec"
+ServiceName  = "CyberSec"
 ```
 
 ### 2.2 Source Code Modifications (16 tracked files)
@@ -74,42 +74,42 @@ ServiceName  = "SasikiranSec"
 | File / Area | Change |
 |-------------|--------|
 | `pkg/branding/branding.go` | **New** — central branding constants |
-| `pkg/cwversion/version.go` | Version output shows "SasikiranSec by Sasikiran" |
-| `cmd/crowdsec-cli/main.go` | CLI renamed to `sscli`, help text uses SasikiranSec |
+| `pkg/cwversion/version.go` | Version output shows "CyberSec by CyberSec" |
+| `cmd/crowdsec-cli/main.go` | CLI renamed to `cybercli`, help text uses CyberSec |
 | `cmd/crowdsec/serve.go` | Log messages use branded Central API name |
-| `cmd/crowdsec/run_in_svc_windows.go` | Windows service name = SasikiranSec |
+| `cmd/crowdsec/run_in_svc_windows.go` | Windows service name = CyberSec |
 | `pkg/apiserver/*.go` | Local API / CAPI log messages rebranded |
-| `pkg/apiclient/useragent/useragent.go` | HTTP User-Agent: `sasikiransec/...` instead of `crowdsec/...` |
+| `pkg/apiclient/useragent/useragent.go` | HTTP User-Agent: `cybersec/...` instead of `cybersec/...` |
 | `pkg/hubops/enable.go` | **Windows fix** — copies hub files instead of symlinks (Windows often blocks symlinks without admin) |
-| `config/config_win.yaml` | Production paths point to `SasikiranSec` folders |
-| `config/sasikiran-local.yaml` | Local dev config template |
+| `config/config_win.yaml` | Production paths point to `CyberSec` folders |
+| `config/cybersec-local.yaml` | Local dev config template |
 | `config/acquis_local_dev.yaml` | Reads from `.local/logs/sample.log` (no admin needed) |
 | `build/mk/platform/windows.mk`, Makefiles | Build output names updated |
-| `README.md` | Rewritten for SasikiranSec quick start |
+| `README.md` | Rewritten for CyberSec quick start |
 
 ### 2.3 New Scripts & UI (not in upstream git diff — local additions)
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/sasikiran-build.ps1` | Build engine + CLI on Windows |
-| `scripts/sasikiran-setup.ps1` | Create `.local/` config, hub, DB, credentials |
-| `scripts/sasikiran-run.ps1` | Start engine (offline, no CAPI) |
-| `scripts/sasikiran-run-capi.ps1` | Start engine with CrowdSec Central API |
-| `scripts/sasikiran-console-enroll.ps1` | Register with app.crowdsec.net |
-| `scripts/sasikiran-dev.ps1` | Engine + simple HTML dashboard on port 3000 |
-| `scripts/sasikiran-ui.ps1` | Simple local dashboard only |
-| `scripts/sasikiran-crowdsec-ui.ps1` | Full CrowdSec Web UI on port 3001 |
-| `scripts/sasikiran-test-alert.ps1` | Inject fake SSH brute-force lines → trigger alert |
-| `ui/index.html` | Custom SasikiranSec dashboard (alerts + decisions) |
-| `docker-compose.crowdsec-ui.yml` | Docker setup for community CrowdSec Web UI |
+| `scripts/cybersec-build.ps1` | Build engine + CLI on Windows |
+| `scripts/cybersec-setup.ps1` | Create `.local/` config, hub, DB, credentials |
+| `scripts/cybersec-run.ps1` | Start engine (offline, no CAPI) |
+| `scripts/cybersec-run-capi.ps1` | Start engine with CyberSec Central API |
+| `scripts/cybersec-console-enroll.ps1` | Register with CyberSec Cloud Console |
+| `scripts/cybersec-dev.ps1` | Engine + simple HTML dashboard on port 3000 |
+| `scripts/cybersec-ui.ps1` | Simple local dashboard only |
+| `scripts/run.ps1` | Unified orchestrator: setup, start, stop, dashboard, attack demo |
+| `scripts/cybersec-test-alert.ps1` | Inject fake SSH brute-force lines → trigger alert |
+| `ui/index.html` | Custom CyberSec dashboard (alerts + decisions) |
+| `docker-compose.cybersec-ui.yml` | Docker setup for community CyberSec Web UI |
 
 ### 2.4 What Was NOT Changed
 
 - Core detection logic (parsers, scenarios, buckets, leaky algorithms)
-- CrowdSec Hub compatibility (same collections, e.g. `crowdsecurity/sshd`)
+- CyberSec Hub compatibility (same collections, e.g. `crowdsecurity/sshd`)
 - Local API protocol (bouncers and UIs still speak standard LAPI)
 - SQLite database schema and alert/decision model
-- Integration with CrowdSec Central API and Console (optional)
+- Integration with CyberSec Central API and Console (optional)
 
 ---
 
@@ -129,8 +129,8 @@ ServiceName  = "SasikiranSec"
 └─────────────────┘            │
                                ▼ (optional)
                     ┌──────────────────────┐
-                    │ CrowdSec Central API │
-                    │ app.crowdsec.net     │
+                    │ CyberSec Central API │
+                    │ CyberSec Cloud Console     │
                     └──────────────────────┘
 ```
 
@@ -159,11 +159,11 @@ From `.local/config/hub/scenarios/crowdsecurity/ssh-bf.yaml`:
 | Aspect | Your current local setup | Real production deployment |
 |--------|--------------------------|----------------------------|
 | Log source | `.local/logs/sample.log` (fake lines) | Real server logs (SSH, IIS, nginx, Windows Event Log) |
-| Detection engine | **Real** CrowdSec logic | **Same** engine |
-| Hub scenarios | **Real** rules from CrowdSec Hub | **Same** rules (+ more collections) |
+| Detection engine | **Real** CyberSec logic | **Same** engine |
+| Hub scenarios | **Real** rules from CyberSec Hub | **Same** rules (+ more collections) |
 | Alerts / decisions | **Real** — stored in DB, visible in UI | **Same** |
 | IP blocking on network | **No** — no bouncer installed | **Yes** — firewall/nginx/cloud bouncer |
-| Threat intel sharing | Disabled (`-no-capi`) by default | Optional CAPI to app.crowdsec.net |
+| Threat intel sharing | Disabled (`-no-capi`) by default | Optional CAPI to CyberSec Cloud Console |
 | Admin rights | Not required for file-based acquis | May need admin for firewall bouncer / symlinks |
 
 ### Is it "only a demo"?
@@ -171,14 +171,14 @@ From `.local/config/hub/scenarios/crowdsecurity/ssh-bf.yaml`:
 **Partially:**
 
 - **Demo part:** Reading a hand-written `sample.log` and viewing alerts in a local dashboard is a **safe learning demo**. No attacker and no real server is involved.
-- **Real part:** The engine, parsers, scenarios, alert generation, and ban decisions are **identical to production CrowdSec**. If you point acquisition at real logs and attach a bouncer, it **will detect and block real attacks**.
+- **Real part:** The engine, parsers, scenarios, alert generation, and ban decisions are **identical to production CyberSec**. If you point acquisition at real logs and attach a bouncer, it **will detect and block real attacks**.
 
 ### What makes it "real" in production?
 
 1. **Real log acquisition** — Monitor actual SSH, web server, or application logs.
-2. **Bouncer** — Install [CrowdSec bouncers](https://doc.crowdsec.net/u/bouncers/intro) (firewall, nginx, Windows firewall, etc.) so ban decisions become actual blocks.
+2. **Bouncer** — Install [CyberSec bouncers](CyberSec documentation) (firewall, nginx, Windows firewall, etc.) so ban decisions become actual blocks.
 3. **More collections** — Install Hub collections for nginx, IIS, SQL injection, CVE exploits, etc.
-4. **CAPI (optional)** — Share/receive community blocklists via CrowdSec Console.
+4. **CAPI (optional)** — Share/receive community blocklists via CyberSec Console.
 
 ---
 
@@ -186,38 +186,38 @@ From `.local/config/hub/scenarios/crowdsecurity/ssh-bf.yaml`:
 
 - **Windows 10/11** (your current environment)
 - **Git** — to clone/update the repo
-- **Go 1.26+** — installed automatically by `sasikiran-build.ps1` via winget if missing
+- **Go 1.26+** — installed automatically by `cybersec-build.ps1` via winget if missing
 - **Internet** — for Hub update during setup (download detection rules)
-- **Optional:** Docker — for CrowdSec Web UI on port 3001
-- **Optional:** Node.js + pnpm — alternative to Docker for CrowdSec Web UI
+- **Optional:** Docker — for CyberSec Web UI on port 3001
+- **Optional:** Node.js + pnpm — alternative to Docker for CyberSec Web UI
 
 ---
 
 ## 6. Setup Instructions (Windows Local Dev)
 
-Open **PowerShell** in the repository root (`c:\Users\Sasikiran\Documents\crowdsec`).
+Open **PowerShell** in the repository root (`c:\Users\CyberSec\Documents\crowdsec`).
 
 ### Step 1 — Build binaries
 
 ```powershell
-.\scripts\sasikiran-build.ps1
+.\scripts\cybersec-build.ps1
 ```
 
 **Output:**
-- `bin\sasikiransec.exe` — security engine
-- `bin\sscli.exe` — command-line interface
+- `bin\cybersec.exe` — security engine
+- `bin\cybercli.exe` — command-line interface
 
 ### Step 2 — Initialize local environment
 
 ```powershell
-.\scripts\sasikiran-setup.ps1
+.\scripts\cybersec-setup.ps1
 ```
 
 **This creates:**
 
 ```
 .local/
-├── sasikiran-local.yaml      # Main config
+├── cybersec-local.yaml      # Main config
 ├── config/
 │   ├── acquis.yaml           # Points to sample.log
 │   ├── hub/                  # Downloaded detection rules
@@ -225,7 +225,7 @@ Open **PowerShell** in the repository root (`c:\Users\Sasikiran\Documents\crowds
 │   ├── simulation.yaml       # simulation: false (real bans)
 │   └── local_api_credentials.yaml
 ├── data/
-│   └── sasikiransec.db       # SQLite database
+│   └── cybersec.db       # SQLite database
 └── logs/
     └── sample.log            # Initial fake SSH attack lines
 ```
@@ -237,8 +237,8 @@ Open **PowerShell** in the repository root (`c:\Users\Sasikiran\Documents\crowds
 ### Step 3 — Verify installation
 
 ```powershell
-.\bin\sscli.exe -c .\.local\sasikiran-local.yaml version
-.\bin\sscli.exe -c .\.local\sasikiran-local.yaml hub list
+.\bin\cybercli.exe -c .\.local\cybersec-local.yaml version
+.\bin\cybercli.exe -c .\.local\cybersec-local.yaml hub list
 ```
 
 ---
@@ -248,7 +248,7 @@ Open **PowerShell** in the repository root (`c:\Users\Sasikiran\Documents\crowds
 ### Option A — Engine only (recommended first)
 
 ```powershell
-.\scripts\sasikiran-run.ps1
+.\scripts\cybersec-run.ps1
 ```
 
 - Local API: `http://127.0.0.1:8080`
@@ -260,31 +260,31 @@ Keep this terminal open. Use a **second terminal** for CLI commands.
 ### Option B — All-in-one dev mode (engine + simple UI)
 
 ```powershell
-.\scripts\sasikiran-dev.ps1
+.\scripts\cybersec-dev.ps1
 ```
 
 - Starts engine if not running
-- Opens **http://127.0.0.1:3000** (custom SasikiranSec dashboard)
+- Opens **http://127.0.0.1:3000** (custom CyberSec dashboard)
 
-### Option C — CrowdSec Web UI (community dashboard)
+### Option C — CyberSec Web UI (community dashboard)
 
 ```powershell
 # Terminal 1 — engine
-.\scripts\sasikiran-run.ps1
+.\scripts\cybersec-run.ps1
 
 # Terminal 2 — full dashboard
-.\scripts\sasikiran-crowdsec-ui.ps1
+.\scripts\cybersec-ui.ps1
 ```
 
 - Opens **http://127.0.0.1:3001**
 
-### Option D — Official cloud console (requires CrowdSec account)
+### Option D — Official cloud console (requires CyberSec account)
 
 ```powershell
-.\scripts\sasikiran-console-enroll.ps1
-# Accept enrollment at https://app.crowdsec.net
+.\scripts\cybersec-console-enroll.ps1
+# Accept enrollment at CyberSec Cloud Console
 
-.\scripts\sasikiran-run-capi.ps1
+.\scripts\cybersec-run-capi.ps1
 ```
 
 ---
@@ -298,7 +298,7 @@ This is the **safest** way to test. No real hacking tools needed.
 With the engine running:
 
 ```powershell
-.\scripts\sasikiran-test-alert.ps1
+.\scripts\cybersec-test-alert.ps1
 ```
 
 **What it does:**
@@ -326,12 +326,12 @@ Repeat **5 times** with the **same IP** within a few seconds to trigger `ssh-bf`
 ### Test 3 — Verify via CLI
 
 ```powershell
-$config = ".\.local\sasikiran-local.yaml"
+$config = ".\.local\cybersec-local.yaml"
 
-.\bin\sscli.exe -c $config alerts list
-.\bin\sscli.exe -c $config decisions list
-.\bin\sscli.exe -c $config metrics
-.\bin\sscli.exe -c $config explain --file .\.local\logs\sample.log --type syslog
+.\bin\cybercli.exe -c $config alerts list
+.\bin\cybercli.exe -c $config decisions list
+.\bin\cybercli.exe -c $config metrics
+.\bin\cybercli.exe -c $config explain --file .\.local\logs\sample.log --type syslog
 ```
 
 `explain` shows how a log line flows through parsers and scenarios **without** needing the engine running.
@@ -339,14 +339,14 @@ $config = ".\.local\sasikiran-local.yaml"
 ### Test 4 — Check simulation mode
 
 ```powershell
-.\bin\sscli.exe -c .\.local\sasikiran-local.yaml simulation status
+.\bin\cybercli.exe -c .\.local\cybersec-local.yaml simulation status
 ```
 
 If `simulation: true`, alerts appear but **no ban decisions** are created. Your setup has `simulation: false`, so bans are real in the database (but not enforced on the network without a bouncer).
 
 ### Test 5 — Dashboard verification
 
-1. Run `.\scripts\sasikiran-dev.ps1`
+1. Run `.\scripts\cybersec-dev.ps1`
 2. Open http://127.0.0.1:3000
 3. Confirm alert count and banned IP appear in the UI
 
@@ -358,9 +358,9 @@ If `simulation: true`, alerts appear but **no ban decisions** are created. Your 
 
 ### Scenario A — Real SSH server (Linux VM or WSL)
 
-This is how CrowdSec is used in production.
+This is how CyberSec is used in production.
 
-1. **Install CrowdSec/SasikiranSec** on a Linux server with SSH enabled.
+1. **Install CyberSec/CyberSec** on a Linux server with SSH enabled.
 2. **Configure acquisition** for `/var/log/auth.log`:
 
 ```yaml
@@ -371,7 +371,7 @@ labels:
   type: syslog
 ```
 
-3. **Install collections:** `sscli collections install crowdsecurity/sshd`
+3. **Install collections:** `cybercli collections install crowdsecurity/sshd`
 4. **Install firewall bouncer:** e.g. `crowdsecurity/firewall-bouncer-iptables`
 5. **Run engine** and bouncer as services.
 6. **Simulate attack** from another machine (your own test VM):
@@ -384,16 +384,16 @@ hydra -l admin -P /usr/share/wordlists/rockyou.txt ssh://YOUR_SERVER_IP -t 4
 7. **Verify on server:**
 
 ```bash
-sscli alerts list
-sscli decisions list
-iptables -L  # or nft list ruleset — should show CrowdSec chain blocking the IP
+cybercli alerts list
+cybercli decisions list
+iptables -L  # or nft list ruleset — should show CyberSec chain blocking the IP
 ```
 
 ### Scenario B — Windows with real logs
 
 For production on Windows:
 
-1. Install as a service using `config\config_win.yaml` (paths under `C:\ProgramData\SasikiranSec\`).
+1. Install as a service using `config\config_win.yaml` (paths under `C:\ProgramData\CyberSec\`).
 2. Configure acquisition for:
    - IIS logs
    - Windows Event Log (via dedicated acquis module)
@@ -414,21 +414,21 @@ Install matching Hub collection: `crowdsecurity/iis`.
 
 ### Scenario C — Use Hub scenario tests (no live attack)
 
-CrowdSec Hub items include test assertions:
+CyberSec Hub items include test assertions:
 
 ```powershell
-.\bin\sscli.exe -c .\.local\sasikiran-local.yaml hub test crowdsecurity/sshd
+.\bin\cybercli.exe -c .\.local\cybersec-local.yaml hub test crowdsecurity/sshd
 ```
 
 This validates parsers and scenarios against known test log samples — **no network attack required**.
 
-### Scenario D — Connect to CrowdSec Console (see real community intel)
+### Scenario D — Connect to CyberSec Console (see real community intel)
 
-1. Enroll: `.\scripts\sasikiran-console-enroll.ps1`
-2. Run with CAPI: `.\scripts\sasikiran-run-capi.ps1`
-3. View alerts at https://app.crowdsec.net
+1. Enroll: `.\scripts\cybersec-console-enroll.ps1`
+2. Run with CAPI: `.\scripts\cybersec-run-capi.ps1`
+3. View alerts at CyberSec Cloud Console
 
-Your instance can receive blocklists from the global CrowdSec community (millions of reported malicious IPs).
+Your instance can receive blocklists from the global CyberSec community (millions of reported malicious IPs).
 
 ### What "real blocking" requires
 
@@ -448,9 +448,9 @@ Your instance can receive blocklists from the global CrowdSec community (million
 
 | UI | URL | Script | Notes |
 |----|-----|--------|-------|
-| SasikiranSec simple dashboard | http://127.0.0.1:3000 | `sasikiran-dev.ps1` or `sasikiran-ui.ps1` | Custom HTML, reads LAPI via sscli |
-| CrowdSec Web UI (community) | http://127.0.0.1:3001 | `sasikiran-crowdsec-ui.ps1` | Full-featured local dashboard |
-| Official CrowdSec Console | https://app.crowdsec.net | `sasikiran-run-capi.ps1` | Cloud-hosted, requires enrollment |
+| CyberSec simple dashboard | http://127.0.0.1:3000 | `cybersec-dev.ps1` or `cybersec-ui.ps1` | Custom HTML, reads LAPI via cybercli |
+| CyberSec Web UI (community) | http://127.0.0.1:3001 | `cybersec-ui.ps1` | Full-featured local dashboard |
+| Official CyberSec Console | CyberSec Cloud Console | `cybersec-run-capi.ps1` | Cloud-hosted, requires enrollment |
 | Prometheus metrics | http://127.0.0.1:6060/metrics | (automatic with engine) | For Grafana/monitoring |
 
 ---
@@ -460,12 +460,12 @@ Your instance can receive blocklists from the global CrowdSec community (million
 All commands use:
 
 ```powershell
-.\bin\sscli.exe -c .\.local\sasikiran-local.yaml <command>
+.\bin\cybercli.exe -c .\.local\cybersec-local.yaml <command>
 ```
 
 | Command | Description |
 |---------|-------------|
-| `version` | Show SasikiranSec version and build info |
+| `version` | Show CyberSec version and build info |
 | `metrics` | Show processing statistics |
 | `alerts list` | List security alerts |
 | `decisions list` | List ban/captcha decisions |
@@ -487,7 +487,7 @@ All commands use:
 
 ```powershell
 # Check config is valid
-.\bin\sscli.exe -c .\.local\sasikiran-local.yaml config show
+.\bin\cybercli.exe -c .\.local\cybersec-local.yaml config show
 
 # Check port 8080 is free
 netstat -an | findstr 8080
@@ -495,10 +495,10 @@ netstat -an | findstr 8080
 
 ### No alerts after adding log lines
 
-1. Confirm engine is running (`sasikiran-run.ps1`).
+1. Confirm engine is running (`cybersec-run.ps1`).
 2. Confirm lines match SSH failed-auth format (see `sample.log`).
 3. Use **5+ failures from the same IP** within ~10 seconds.
-4. Check metrics: `sscli metrics` — look for `parsed_lines` increasing.
+4. Check metrics: `cybercli metrics` — look for `parsed_lines` increasing.
 5. Run `explain` to verify parser output.
 
 ### Hub install fails on Windows
@@ -506,47 +506,47 @@ netstat -an | findstr 8080
 The fork includes a **Windows symlink workaround** in `pkg/hubops/enable.go` — hub files are copied instead of symlinked. Re-run setup:
 
 ```powershell
-.\scripts\sasikiran-setup.ps1
+.\scripts\cybersec-setup.ps1
 ```
 
 ### Dashboard shows empty data
 
 1. Engine must be running on port 8080.
-2. Run `sscli alerts list` — if CLI shows data but UI does not, restart the UI script.
+2. Run `cybercli alerts list` — if CLI shows data but UI does not, restart the UI script.
 3. For port 3000 vs 3001 conflicts, stop the other UI first.
 
 ### CAPI / console enrollment fails
 
 - Requires internet access.
-- Create a free account at https://app.crowdsec.net first.
-- Run `sasikiran-console-enroll.ps1` and accept the enrollment in the browser.
+- Create a free account at CyberSec Cloud Console first.
+- Run `cybersec-console-enroll.ps1` and accept the enrollment in the browser.
 
 ---
 
 ## 13. File & Folder Map
 
 ```
-crowdsec/                          # Repository root
+cybersec/                           # Repository root
 ├── bin/
-│   ├── sasikiransec.exe           # Security engine (built)
-│   └── sscli.exe                  # CLI (built)
+│   ├── cybersec.exe           # Security engine (built)
+│   └── cybercli.exe                  # CLI (built)
 ├── cmd/
-│   ├── crowdsec/                  # Engine source (built as sasikiransec)
-│   └── crowdsec-cli/              # CLI source (built as sscli)
+│   ├── engine/                      # Engine source (built as cybersec)
+│   └── cli/                         # CLI source (built as cybercli)
 ├── pkg/
-│   └── branding/branding.go       # SasikiranSec naming
+│   └── branding/branding.go       # CyberSec naming
 ├── config/
-│   ├── sasikiran-local.yaml       # Local dev config template
+│   ├── cybersec-local.yaml       # Local dev config template
 │   ├── acquis_local_dev.yaml      # File-based log acquisition
 │   └── config_win.yaml            # Production Windows paths
 ├── scripts/
-│   └── sasikiran-*.ps1            # All automation scripts
+│   └── cybersec-*.ps1            # All automation scripts
 ├── ui/
 │   └── index.html                 # Simple dashboard
 ├── .local/                        # Created by setup (gitignored)
-│   ├── sasikiran-local.yaml
+│   ├── cybersec-local.yaml
 │   ├── config/hub/                # Detection rules
-│   ├── data/sasikiransec.db
+│   ├── data/cybersec.db
 │   └── logs/sample.log
 ├── instruction.md                 # This file
 └── README.md                      # Quick start summary
@@ -558,21 +558,21 @@ crowdsec/                          # Repository root
 
 ```powershell
 # 1. One-time setup
-.\scripts\sasikiran-build.ps1
-.\scripts\sasikiran-setup.ps1
+.\scripts\cybersec-build.ps1
+.\scripts\cybersec-setup.ps1
 
 # 2. Start engine (Terminal 1)
-.\scripts\sasikiran-run.ps1
+.\scripts\cybersec-run.ps1
 
 # 3. Trigger test attack (Terminal 2)
-.\scripts\sasikiran-test-alert.ps1
+.\scripts\cybersec-test-alert.ps1
 
 # 4. View results
-.\bin\sscli.exe -c .\.local\sasikiran-local.yaml alerts list
-.\bin\sscli.exe -c .\.local\sasikiran-local.yaml decisions list
+.\bin\cybercli.exe -c .\.local\cybersec-local.yaml alerts list
+.\bin\cybercli.exe -c .\.local\cybersec-local.yaml decisions list
 
 # 5. Optional — open dashboard
-.\scripts\sasikiran-dev.ps1
+.\scripts\cybersec-dev.ps1
 # Browser: http://127.0.0.1:3000
 ```
 
@@ -582,11 +582,11 @@ crowdsec/                          # Repository root
 
 | Question | Answer |
 |----------|--------|
-| What is SasikiranSec? | A rebranded CrowdSec fork for learning and Windows local dev |
-| Is detection real? | **Yes** — same Hub parsers and scenarios as production CrowdSec |
+| What is CyberSec? | A rebranded CyberSec fork for learning and Windows local dev |
+| Is detection real? | **Yes** — same Hub parsers and scenarios as production CyberSec |
 | Is current setup a demo? | **Partly** — uses fake log file; no bouncer for network blocking |
 | Can it stop real attacks? | **Yes**, when pointed at real logs + bouncer installed |
-| How to test safely now? | Run `sasikiran-test-alert.ps1` and check alerts/decisions |
+| How to test safely now? | Run `cybersec-test-alert.ps1` and check alerts/decisions |
 | How to test like production? | Linux server + real auth.log + firewall bouncer + controlled brute force |
 
-For questions or next steps (installing a bouncer, monitoring IIS, deploying as a Windows service), extend acquisition and Hub collections following [CrowdSec documentation](https://doc.crowdsec.net/).
+For questions or next steps (installing a bouncer, monitoring IIS, deploying as a Windows service), extend acquisition and Hub collections following [CyberSec documentation](CyberSec documentation).

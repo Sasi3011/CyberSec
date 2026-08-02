@@ -1,4 +1,4 @@
-package clisupport
+﻿package clisupport
 
 import (
 	"archive/zip"
@@ -355,7 +355,7 @@ func (cli *cliSupport) dumpPAPIStatus(ctx context.Context, zw *zip.Writer, db *d
 }
 
 func (cli *cliSupport) dumpConfigYAML(zw *zip.Writer) error {
-	fmt.Fprintln(os.Stdout, "Collecting crowdsec config")
+	fmt.Fprintln(os.Stdout, "Collecting CyberSec config")
 
 	cfg := cli.cfg()
 
@@ -411,7 +411,7 @@ func (cli *cliSupport) dumpPprof(ctx context.Context, zw *zip.Writer, prometheus
 }
 
 func (cli *cliSupport) dumpProfiles(zw *zip.Writer) {
-	fmt.Fprintln(os.Stdout, "Collecting crowdsec profile")
+	fmt.Fprintln(os.Stdout, "Collecting CyberSec profile")
 
 	cfg := cli.cfg()
 	cli.writeFileToZip(zw, SUPPORT_CROWDSEC_PROFILE_PATH, cfg.API.Server.ProfilesPath)
@@ -429,7 +429,7 @@ func (cli *cliSupport) dumpAcquisitionConfig(zw *zip.Writer) {
 }
 
 func (cli *cliSupport) dumpLogs(zw *zip.Writer) error {
-	fmt.Fprintln(os.Stdout, "Collecting CrowdSec logs")
+	fmt.Fprintln(os.Stdout, "CyberSec logs")
 
 	cfg := cli.cfg()
 
@@ -552,7 +552,7 @@ func (cli *cliSupport) dump(ctx context.Context, outFile string, fast bool) erro
 	}
 
 	if err = cfg.LoadCrowdsec(); err != nil {
-		log.Warnf("could not load agent config, skipping crowdsec config check")
+		log.Warnf("could not load agent config, skipping CyberSec config check")
 
 		skipAgent = true
 	}
@@ -685,15 +685,15 @@ func (cli *cliSupport) NewDumpCmd() *cobra.Command {
 		Use:   "dump",
 		Short: "Dump all your configuration to a zip file for easier support",
 		Long: `Dump the following information:
-- Crowdsec version
+- CyberSec version
 - OS version and runtime system information
 - Enabled feature flags
-- Latest Crowdsec logs (log processor, LAPI, remediation components)
+- Latest CyberSec logs (log processor, LAPI, remediation components)
 - Installed collections, parsers, scenarios...
 - Bouncers and machines list
 - CAPI/LAPI status
-- Crowdsec config (sensitive information like username and password are redacted)
-- Crowdsec metrics
+- CyberSec config (sensitive information like username and password are redacted)
+- CyberSec metrics
 - Stack trace in case of process crash`,
 		Example: `cscli support dump
 cscli support dump -f /tmp/crowdsec-support.zip

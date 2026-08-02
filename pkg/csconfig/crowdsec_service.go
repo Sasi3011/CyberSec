@@ -1,4 +1,4 @@
-package csconfig
+﻿package csconfig
 
 import (
 	"errors"
@@ -97,7 +97,7 @@ func (c *Config) LoadCrowdsec() error {
 	var err error
 
 	if c.Crowdsec == nil {
-		log.Warning("crowdsec agent is disabled")
+		log.Warning("CyberSec agent is disabled")
 
 		c.DisableAgent = true
 
@@ -110,7 +110,7 @@ func (c *Config) LoadCrowdsec() error {
 	}
 
 	if !*c.Crowdsec.Enable {
-		log.Warning("crowdsec agent is disabled")
+		log.Warning("CyberSec agent is disabled")
 		c.DisableAgent = true
 		return nil
 	}

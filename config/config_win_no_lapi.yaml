@@ -1,24 +1,24 @@
 common:
   log_media: file
   log_level: info
-  log_dir:  C:\ProgramData\CrowdSec\log\
+  log_dir:  C:\ProgramData\CyberSec\log\
 config_paths:
-  config_dir:  C:\ProgramData\CrowdSec\config\
-  data_dir:  C:\ProgramData\CrowdSec\data\
-  simulation_path:   C:\ProgramData\CrowdSec\config\simulation.yaml
-  hub_dir:  C:\ProgramData\CrowdSec\hub\
-  index_path:  C:\ProgramData\CrowdSec\hub\.index.json
-  plugin_dir: C:\ProgramData\CrowdSec\plugins\
-  notification_dir:  C:\ProgramData\CrowdSec\config\notifications\
+  config_dir:  C:\ProgramData\CyberSec\config\
+  data_dir:  C:\ProgramData\CyberSec\data\
+  simulation_path:   C:\ProgramData\CyberSec\config\simulation.yaml
+  hub_dir:  C:\ProgramData\CyberSec\hub\
+  index_path:  C:\ProgramData\CyberSec\hub\.index.json
+  plugin_dir: C:\ProgramData\CyberSec\plugins\
+  notification_dir:  C:\ProgramData\CyberSec\config\notifications\
 crowdsec_service:
-  acquisition_path:  C:\ProgramData\CrowdSec\config\acquis.yaml
+  acquisition_path:  C:\ProgramData\CyberSec\config\acquis.yaml
   parser_routines: 1
 cscli:
   output: human
 api:
   client:
     insecure_skip_verify: false
-    credentials_path:  C:\ProgramData\CrowdSec\config\local_api_credentials.yaml
+    credentials_path:  C:\ProgramData\CyberSec\config\local_api_credentials.yaml
 prometheus:
   enabled: true
   level: full

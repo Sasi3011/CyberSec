@@ -1,4 +1,4 @@
-package v1
+﻿package v1
 
 import (
 	"crypto/rand"
@@ -292,7 +292,7 @@ func NewJWT(dbClient *database.Client) (*JWT, error) {
 	}
 
 	ret, err := jwt.New(&jwt.GinJWTMiddleware{
-		Realm:           "Crowdsec API local",
+		Realm:           "CyberSec API local",
 		Key:             secret,
 		Timeout:         time.Hour,
 		MaxRefresh:      time.Hour,

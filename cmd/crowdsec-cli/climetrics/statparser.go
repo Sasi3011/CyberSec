@@ -1,4 +1,4 @@
-package climetrics
+﻿package climetrics
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ func (statParser) Description() (string, string) {
 	return "Parser Metrics",
 		`Tracks the number of events processed by each parser and indicates success of failure. ` +
 			`Zero parsed lines means the parser(s) failed. ` +
-			`Non-zero unparsed lines are fine as crowdsec select relevant lines.`
+			`Non-zero unparsed lines are fine as CyberSec selects relevant lines.`
 }
 
 func (s statParser) Process(parser, metric string, val int) {

@@ -1,4 +1,4 @@
-package clisetup
+﻿package clisetup
 
 import (
 	"github.com/spf13/cobra"
@@ -20,7 +20,7 @@ func New(cfg csconfig.Getter) *cliSetup {
 func (cli *cliSetup) NewCommand() *cobra.Command {
 	cmd := cli.newInteractiveCmd()
 	cmd.Use = "setup"
-	cmd.Short = "Tools to configure crowdsec"
+	cmd.Short = "Tools to configure CyberSec"
 	cmd.Long = "Manage service detection and hub/acquisition configuration"
 	cmd.Example = `# Call one of detect, install-hub, etc.
 cscli setup [command]

@@ -1,4 +1,4 @@
-type: slack           # Don't change
+﻿type: slack           # Don't change
 name: slack_default   # Must match the registered plugin in the profile
 
 # One of "trace", "debug", "info", "warn", "error", "off"
@@ -19,9 +19,9 @@ format: |
   {{$alert := . -}}
   {{range .Decisions -}}
   {{if $alert.Source.Cn -}}
-  :flag-{{$alert.Source.Cn}}: <https://www.whois.com/whois/{{.Value}}|{{.Value}}> will get {{.Type}} for next {{.Duration}} for triggering {{.Scenario}} on machine '{{$alert.MachineID}}'. <https://app.crowdsec.net/cti/{{.Value}}|CrowdSec CTI>{{end}}
+  :flag-{{$alert.Source.Cn}}: <https://www.whois.com/whois/{{.Value}}|{{.Value}}> will get {{.Type}} for next {{.Duration}} for triggering {{.Scenario}} on machine '{{$alert.MachineID}}'. <CyberSec Cloud Console CTI>{{end}}
   {{if not $alert.Source.Cn -}}
-  :pirate_flag: <https://www.whois.com/whois/{{.Value}}|{{.Value}}> will get {{.Type}} for next {{.Duration}} for triggering {{.Scenario}} on machine '{{$alert.MachineID}}'.  <https://app.crowdsec.net/cti/{{.Value}}|CrowdSec CTI>{{end}}
+  :pirate_flag: <https://www.whois.com/whois/{{.Value}}|{{.Value}}> will get {{.Type}} for next {{.Duration}} for triggering {{.Scenario}} on machine '{{$alert.MachineID}}'.  <CyberSec Cloud Console CTI>{{end}}
   {{end -}}
   {{end -}}
 

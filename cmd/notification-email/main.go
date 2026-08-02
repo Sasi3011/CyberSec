@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"context"
@@ -63,11 +63,11 @@ type EmailPlugin struct {
 func (n *EmailPlugin) Configure(_ context.Context, config *protobufs.Config) (*protobufs.Empty, error) {
 	d := PluginConfig{
 		SMTPPort:       25,
-		SenderName:     "Crowdsec",
-		EmailSubject:   "Crowdsec notification",
+		SenderName:     "CyberSec",
+		EmailSubject:   "CyberSec notification",
 		EncryptionType: "ssltls",
 		AuthType:       "login",
-		SenderEmail:    "crowdsec@crowdsec.local",
+		SenderEmail:    "noreply@cybersec.local",
 		HeloHost:       "localhost",
 	}
 

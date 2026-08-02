@@ -1,4 +1,4 @@
-package climetrics
+﻿package climetrics
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ type statDecision map[string]map[string]map[string]int
 func (statDecision) Description() (string, string) {
 	return "Local API Decisions",
 		`Provides information about all currently active decisions. ` +
-			`Includes both local (crowdsec) and global decisions (CAPI), and lists subscriptions (lists).`
+			`Includes both local (CyberSec) and global decisions (CAPI), and lists subscriptions (lists).`
 }
 
 func (s statDecision) Process(reason, origin, action string, val int) {

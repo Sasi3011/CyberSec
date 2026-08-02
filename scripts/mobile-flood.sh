@@ -1,5 +1,5 @@
-#!/data/data/com.termux/files/usr/bin/bash
-# SasikiranSec - flood honeypot from phone (Termux on Android)
+﻿#!/data/data/com.termux/files/usr/bin/bash
+# CyberSec - flood honeypot from phone (Termux on Android)
 # Usage: ./mobile-flood.sh PUBLIC_IP [PORT] [COUNT]
 # Example: ./mobile-flood.sh 49.36.123.45 9999 25
 #
@@ -9,7 +9,7 @@ HOST="${1:?Usage: $0 PUBLIC_IP [PORT] [COUNT]}"
 PORT="${2:-9999}"
 COUNT="${3:-25}"
 
-echo "===== SasikiranSec Mobile ATTACK ====="
+echo "===== CyberSec Mobile ATTACK ====="
 echo "  Target: $HOST:$PORT"
 echo "  Flood:  $COUNT connections"
 echo ""

@@ -1,11 +1,11 @@
-# Internal worker - dashboard server (spawned by run.ps1 start)
+﻿# Internal worker - dashboard server (spawned by run.ps1 start)
 
 param([int]$Port = 3000)
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
-$Cli = Join-Path $RepoRoot "bin\sscli.exe"
-$Config = Join-Path $RepoRoot ".local\sasikiran-local.yaml"
+$Cli = Join-Path $RepoRoot "bin\cybercli.exe"
+$Config = Join-Path $RepoRoot ".local\cybersec-local.yaml"
 $LapiPort = 8080
 $MetricsPort = 6060
 
@@ -66,7 +66,7 @@ function Read-JsonBody {
     return ($raw | ConvertFrom-Json)
 }
 
-$RulePrefix = "SasikiranSec-Block"
+$RulePrefix = "CyberSec-Block"
 
 function Get-FirewallRuleName {
     param([string]$Ip)
@@ -117,7 +117,7 @@ function Get-HostPublicGeo {
 function Get-ReverseGeo {
     param([double]$Lat, [double]$Lon)
     try {
-        $headers = @{ "User-Agent" = "SasikiranSec-Dashboard/1.0 (local security demo)" }
+        $headers = @{ "User-Agent" = "CyberSec-Dashboard/1.0 (local security demo)" }
         $uri = "https://nominatim.openstreetmap.org/reverse?lat=$Lat&lon=$Lon&format=json&zoom=18&addressdetails=1"
         $r = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec 8
         $a = $r.address
@@ -452,7 +452,7 @@ while ($listener.IsListening) {
             $ip = [string]$body.ip
             if (-not $ip) { throw "Missing ip" }
             $duration = if ($body.duration) { [string]$body.duration } else { "4h" }
-            Invoke-Sscli -CmdArgs @("decisions", "add", "--ip", $ip, "-d", $duration, "-R", "sasikiransec/ui-manual", "-t", "ban") | Out-Null
+            Invoke-Sscli -CmdArgs @("decisions", "add", "--ip", $ip, "-d", $duration, "-R", "cybersec/ui-manual", "-t", "ban") | Out-Null
             $json = (@{ ok = $true; ip = $ip; action = "block"; duration = $duration } | ConvertTo-Json -Compress)
             $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
             $response.ContentType = "application/json"
@@ -460,7 +460,7 @@ while ($listener.IsListening) {
         }
         elseif ($path -eq "/api/health") {
             $backend = Test-LapiUp
-            $payload = @{ status = if ($backend) { "ok" } else { "offline" }; service = "SasikiranSec"; version = "v1.7.8"; backend = "127.0.0.1:$LapiPort" }
+            $payload = @{ status = if ($backend) { "ok" } else { "offline" }; service = "CyberSec"; version = "v1.7.8"; backend = "127.0.0.1:$LapiPort" }
             $json = $payload | ConvertTo-Json -Compress
             $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
             $response.ContentType = "application/json"

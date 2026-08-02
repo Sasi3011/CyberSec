@@ -1,4 +1,4 @@
-package reload
+﻿package reload
 
 // assume systemd, although gentoo and others may differ
-const message = "Run 'sudo systemctl reload crowdsec' for the new configuration to be effective."
+const message = "Run 'sudo systemctl reload cybersec' for the new configuration to be effective."

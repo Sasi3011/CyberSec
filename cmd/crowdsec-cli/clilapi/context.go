@@ -1,4 +1,4 @@
-package clilapi
+﻿package clilapi
 
 import (
 	"errors"
@@ -261,7 +261,7 @@ func (cli *cliLapi) newContextCmd() *cobra.Command {
 			if err := cfg.LoadCrowdsec(); err != nil {
 				fileNotFoundMessage := fmt.Sprintf("failed to open context file: open %s: no such file or directory", cfg.Crowdsec.ConsoleContextPath)
 				if err.Error() != fileNotFoundMessage {
-					return fmt.Errorf("unable to load CrowdSec agent configuration: %w", err)
+					return fmt.Errorf("unable to load CyberSec agent configuration: %w", err)
 				}
 			}
 

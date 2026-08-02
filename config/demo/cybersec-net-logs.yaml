@@ -1,7 +1,7 @@
-onsuccess: next_stage
-filter: "evt.Parsed.program == 'sasikiran-net'"
-name: sasikiran/net-logs
-description: "Parse SasikiranSec network attack logs"
+﻿onsuccess: next_stage
+filter: "evt.Parsed.program == 'cybersec-net'"
+name: cybersec/net-logs
+description: "Parse CyberSec network attack logs"
 pattern_syntax:
   SASIKIRAN_ATTACK: 'ATTACK type=%{WORD:attack_type} source=%{IP:source_ip} port=%{NUMBER:target_port}'
 nodes:
@@ -10,13 +10,13 @@ nodes:
       apply_on: message
       statics:
         - meta: log_type
-          value: sasikiran_net_attack
+          value: cybersec_net_attack
         - meta: attack_type
           expression: evt.Parsed.attack_type
         - meta: source_ip
           expression: evt.Parsed.source_ip
 statics:
   - meta: service
-    value: sasikiran-net
+    value: cybersec-net
   - meta: source_ip
     expression: evt.Parsed.source_ip

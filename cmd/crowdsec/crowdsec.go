@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"context"
@@ -229,7 +229,7 @@ func serveCrowdsec(
 			agentReady <- true
 
 			if err := runCrowdsec(cctx, &g, cConfig, parsers, hub, datasources, sd, bucketStore); err != nil {
-				log.Fatalf("unable to start crowdsec routines: %s", err)
+				log.Fatalf("unable to start CyberSec routines: %s", err)
 			}
 		}()
 
@@ -241,7 +241,7 @@ func serveCrowdsec(
 		log.Debugf("Shutting down crowdsec routines")
 
 		if err := ShutdownCrowdsecRoutines(cancel, &g, datasources); err != nil {
-			return fmt.Errorf("unable to shutdown crowdsec routines: %w", err)
+			return fmt.Errorf("unable to shutdown CyberSec routines: %w", err)
 		}
 
 		log.Debugf("everything is dead, return crowdsecTomb")
@@ -285,7 +285,7 @@ func waitOnTomb() {
 			return
 
 		case <-crowdsecTomb.Dying():
-			log.Infof("Crowdsec engine shutting down")
+			log.Infof("CyberSec engine shutting down")
 			return
 		}
 	}

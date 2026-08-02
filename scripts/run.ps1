@@ -1,4 +1,4 @@
-# SasikiranSec - Single script for host and other device
+﻿# CyberSec - Single script for host and other device
 #
 # HOST (project folder):
 #   .\scripts\run.ps1 setup
@@ -31,15 +31,15 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ScriptName = Split-Path -Leaf $MyInvocation.MyCommand.Path
-if (Test-Path (Join-Path (Split-Path $ScriptDir -Parent) "bin\sasikiransec.exe")) {
+if (Test-Path (Join-Path (Split-Path $ScriptDir -Parent) "bin\cybersec.exe")) {
     $RepoRoot = Split-Path $ScriptDir -Parent
-} elseif (Test-Path (Join-Path $ScriptDir "bin\sasikiransec.exe")) {
+} elseif (Test-Path (Join-Path $ScriptDir "bin\cybersec.exe")) {
     $RepoRoot = $ScriptDir
 } else {
     $RepoRoot = $null
 }
 
-$IsHost = ($null -ne $RepoRoot) -and (Test-Path (Join-Path $RepoRoot "bin\sasikiransec.exe"))
+$IsHost = ($null -ne $RepoRoot) -and (Test-Path (Join-Path $RepoRoot "bin\cybersec.exe"))
 
 $LapiPort = 8080
 $UiPort = 3000
@@ -47,9 +47,9 @@ $MetricsPort = 6060
 
 if ($IsHost) {
     Set-Location $RepoRoot
-    $configFile = Join-Path $RepoRoot ".local\sasikiran-local.yaml"
-    $engine = Join-Path $RepoRoot "bin\sasikiransec.exe"
-    $cli = Join-Path $RepoRoot "bin\sscli.exe"
+    $configFile = Join-Path $RepoRoot ".local\cybersec-local.yaml"
+    $engine = Join-Path $RepoRoot "bin\cybersec.exe"
+    $cli = Join-Path $RepoRoot "bin\cybercli.exe"
     $bouncerConfig = Join-Path $RepoRoot ".local\bouncer\bouncer.yaml"
     $runDir = Join-Path $RepoRoot ".local\run"
     $pidFile = Join-Path $runDir "processes.json"
@@ -135,7 +135,7 @@ function Write-CrossNetworkFiles {
     $lan = if ($LanIp) { $LanIp } else { "YOUR_LAN_IP" }
 
     $guide = @"
-SasikiranSec - Attack from MOBILE DATA (different network)
+CyberSec - Attack from MOBILE DATA (different network)
 ==========================================================
 
 HOST must be running: .\scripts\run.ps1 start  (Admin, keep open)
@@ -163,7 +163,7 @@ STEP 3 - Phone on MOBILE DATA (turn OFF Wi-Fi)
 
 Detection uses the phone's real carrier IP on the dashboard map.
 "@
-    $guidePath = Join-Path $desktop "SasikiranSec-CROSS-NETWORK.txt"
+    $guidePath = Join-Path $desktop "CyberSec-CROSS-NETWORK.txt"
     $utf8 = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($guidePath, $guide, $utf8)
 
@@ -309,7 +309,7 @@ function Do-RemoteAttack {
     $myIp = Get-MyLanIp -PreferSameSubnetAs $HostIp
     Clear-Host
     Write-Host ""
-    Write-Host "  ===== SasikiranSec Remote ATTACK =====" -ForegroundColor Red
+    Write-Host "  ===== CyberSec Remote ATTACK =====" -ForegroundColor Red
     Write-Host ""
     Write-Host "  Your IP:   $(if ($myIp) { $myIp } else { 'unknown - run ipconfig' })" -ForegroundColor Yellow
     Write-Host "  Target:    $HostIp" -ForegroundColor Yellow
@@ -408,7 +408,7 @@ if (-not $IsHost) {
 
 function Show-Help {
     Write-Host ""
-    Write-Host "  SasikiranSec - run.ps1" -ForegroundColor Cyan
+    Write-Host "  CyberSec - run.ps1" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  .\scripts\run.ps1 setup              First-time build and config"
     Write-Host "  .\scripts\run.ps1 start              Start all (Admin, keep open)"
@@ -446,11 +446,11 @@ function Show-Info {
 }
 
 function Do-Setup {
-    Write-Host "=== SasikiranSec Setup ==="
-    & (Join-Path $RepoRoot "scripts\sasikiran-build.ps1")
-    & (Join-Path $RepoRoot "scripts\sasikiran-setup.ps1")
+    Write-Host "=== CyberSec Setup ==="
+    & (Join-Path $RepoRoot "scripts\cybersec-build.ps1")
+    & (Join-Path $RepoRoot "scripts\cybersec-setup.ps1")
     if (-not (Test-Path $bouncerConfig)) {
-        & (Join-Path $RepoRoot "scripts\sasikiran-bouncer-setup.ps1")
+        & (Join-Path $RepoRoot "scripts\cybersec-bouncer-setup.ps1")
     }
     Write-Host ""
     Write-Host "Setup complete. Run: .\scripts\run.ps1 start"
@@ -471,7 +471,7 @@ function Require-ValidIp {
 function Do-Block {
     Require-ValidIp -TargetIp $Ip
     Write-Host "Blocking $Ip ..."
-    & $cli -c $configFile decisions add --ip $Ip -d 4h -R "sasikiransec/demo" -t ban
+    & $cli -c $configFile decisions add --ip $Ip -d 4h -R "cybersec/demo" -t ban
     if ($LASTEXITCODE -ne 0) { exit 1 }
     Write-Host "Ban added. Wait 15 seconds, then AFTER test on other device."
     Start-Sleep -Seconds 2
@@ -484,7 +484,7 @@ function Do-Status {
     & $cli -c $configFile decisions list 2>$null
     Write-Host ""
     Write-Host "  --- Firewall rules ---" -ForegroundColor Cyan
-    $rules = Get-NetFirewallRule -DisplayName "SasikiranSec-Block-*" -ErrorAction SilentlyContinue
+    $rules = Get-NetFirewallRule -DisplayName "CyberSec-Block-*" -ErrorAction SilentlyContinue
     if ($rules) {
         foreach ($r in $rules) {
             $a = (Get-NetFirewallAddressFilter -AssociatedNetFirewallRule $r -ErrorAction SilentlyContinue).RemoteAddress
@@ -550,7 +550,7 @@ function Start-EngineProcess {
 }
 
 function Test-NeedsBootstrap {
-    $db = Join-Path $RepoRoot ".local\data\sasikiransec.db"
+    $db = Join-Path $RepoRoot ".local\data\cybersec.db"
     return -not (Test-Path $db)
 }
 
@@ -636,7 +636,7 @@ function Save-ProcessIds {
 }
 
 function Stop-AllServices {
-    Write-Host "Stopping SasikiranSec..."
+    Write-Host "Stopping CyberSec..."
 
     if (Test-Path $pidFile) {
         try {
@@ -656,7 +656,7 @@ function Stop-AllServices {
         }
     }
 
-    Get-Process -Name "sasikiransec" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process -Name "cybersec" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     foreach ($port in @($TestPort, $UiPort, $LapiPort, $MetricsPort)) {
         Stop-PortListeners -Port $port
     }
@@ -665,13 +665,13 @@ function Stop-AllServices {
 
 function Ensure-Prerequisites {
     if (-not (Test-Path $engine)) {
-        & (Join-Path $RepoRoot "scripts\sasikiran-build.ps1")
+        & (Join-Path $RepoRoot "scripts\cybersec-build.ps1")
     }
     if (-not (Test-Path $configFile)) {
-        & (Join-Path $RepoRoot "scripts\sasikiran-setup.ps1")
+        & (Join-Path $RepoRoot "scripts\cybersec-setup.ps1")
     }
     if (-not (Test-Path $bouncerConfig)) {
-        & (Join-Path $RepoRoot "scripts\sasikiran-bouncer-setup.ps1")
+        & (Join-Path $RepoRoot "scripts\cybersec-bouncer-setup.ps1")
     }
 }
 
@@ -682,7 +682,7 @@ function Remove-AllFirewallBlocks {
     }
     $count = 0
     while ($true) {
-        $batch = @(Get-NetFirewallRule -DisplayName "SasikiranSec-Block-*" -ErrorAction SilentlyContinue | Select-Object -First 100)
+        $batch = @(Get-NetFirewallRule -DisplayName "CyberSec-Block-*" -ErrorAction SilentlyContinue | Select-Object -First 100)
         if (-not $batch.Count) { break }
         $batch | Remove-NetFirewallRule -ErrorAction SilentlyContinue
         $count += $batch.Count
@@ -705,14 +705,14 @@ function Do-Clean {
     }
 
     Write-Host ""
-    Write-Host "=== SasikiranSec CLEAN RESET ===" -ForegroundColor Yellow
+    Write-Host "=== CyberSec CLEAN RESET ===" -ForegroundColor Yellow
     Write-Host ""
 
     Stop-AllServices
 
     $dataDir = Join-Path $RepoRoot ".local\data"
     $logDir = Join-Path $RepoRoot ".local\logs"
-    $uiDataDir = Join-Path $RepoRoot ".local\crowdsec-web-ui\data"
+    $uiDataDir = Join-Path $RepoRoot ".local\cybersec-web-ui\data"
 
     if (Test-Path $dataDir) {
         Remove-Item $dataDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -771,7 +771,7 @@ function Do-Start {
 
     try {
         Write-Host ""
-        Write-Host "=== SasikiranSec Starting ==="
+        Write-Host "=== CyberSec Starting ==="
         Write-Host ""
 
         Stop-AllServices
@@ -801,7 +801,7 @@ function Do-Start {
         }
         Write-Host "  Dashboard ready (PID $($script:uiProc.Id))"
 
-        $allowName = "SasikiranSec-TestPort-$TestPort"
+        $allowName = "CyberSec-TestPort-$TestPort"
         if (-not (Get-NetFirewallRule -DisplayName $allowName -ErrorAction SilentlyContinue)) {
             New-NetFirewallRule -DisplayName $allowName -Direction Inbound -Action Allow `
                 -Protocol TCP -LocalPort $TestPort -Profile Domain,Private,Public | Out-Null
@@ -821,7 +821,7 @@ function Do-Start {
         $lanIp = Get-MyLanIp
         Write-Host ""
         Write-Host "==========================================" -ForegroundColor Green
-        Write-Host "  SasikiranSec RUNNING" -ForegroundColor Green
+        Write-Host "  CyberSec RUNNING" -ForegroundColor Green
         Write-Host "=========================================="
         Write-Host "  Dashboard:   http://127.0.0.1:$UiPort"
         Write-Host "  Your LAN IP: $(if ($lanIp) { $lanIp } else { 'unknown' })  (same Wi-Fi)"

@@ -1,8 +1,8 @@
 swagger: '2.0'
 info:
   version: 1.0.0
-  title: Swagger CrowdSec
-  description: CrowdSec local API
+  title: Swagger CyberSec
+  description: CyberSec Local API
   contact:
     email: contact@crowdsec.net
 host: 127.0.0.1
@@ -1511,4 +1511,4 @@ tags:
     description: 'Operations about watchers : cscli & crowdsec'
 externalDocs:
   url: 'https://github.com/crowdsecurity/crowdsec'
-  description: Find out more about CrowdSec
+  description: Find out more about CyberSec

@@ -1,4 +1,4 @@
-# Internal worker - attack honeypot (spawned by run.ps1 start)
+﻿# Internal worker - attack honeypot (spawned by run.ps1 start)
 # Each TCP connection logs an SSH brute-force line the engine detects automatically.
 # Uses existing crowdsecurity/ssh-bf scenario (capacity 5, leakspeed 10s).
 
@@ -55,7 +55,7 @@ try {
 
         try {
             $stream = $client.GetStream()
-            $msg = [System.Text.Encoding]::UTF8.GetBytes("SasikiranSec honeypot`n")
+            $msg = [System.Text.Encoding]::UTF8.GetBytes("CyberSec honeypot`n")
             $stream.Write($msg, 0, $msg.Length)
         }
         catch { }

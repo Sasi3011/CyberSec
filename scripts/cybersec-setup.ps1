@@ -1,4 +1,4 @@
-# SasikiranSec - Local environment setup
+﻿# CyberSec - Local environment setup
 # Creates .local/ config tree and installs hub collections
 
 $ErrorActionPreference = "Continue"
@@ -12,14 +12,14 @@ $hubDir = Join-Path $configDir "hub"
 $logDir = Join-Path $base "logs"
 $pluginsDir = Join-Path $base "plugins"
 $notifDir = Join-Path $configDir "notifications"
-$configFile = Join-Path $base "sasikiran-local.yaml"
+$configFile = Join-Path $base "cybersec-local.yaml"
 
-$engine = Join-Path $RepoRoot "bin\sasikiransec.exe"
-$cli = Join-Path $RepoRoot "bin\sscli.exe"
+$engine = Join-Path $RepoRoot "bin\cybersec.exe"
+$cli = Join-Path $RepoRoot "bin\cybercli.exe"
 
 if (-not (Test-Path $engine)) {
     Write-Host "Binaries not found. Running build first..."
-    & "$RepoRoot\scripts\sasikiran-build.ps1"
+    & "$RepoRoot\scripts\cybersec-build.ps1"
 }
 
 Write-Host "Creating local directories in $base..."
@@ -55,7 +55,7 @@ $env:DATA_DIR = $dataDir
 $env:PLUGINS_DIR = $pluginsDir
 $env:USERNAME = $env:USERNAME
 
-$raw = Get-Content "$RepoRoot\config\sasikiran-local.yaml" -Raw
+$raw = Get-Content "$RepoRoot\config\cybersec-local.yaml" -Raw
 $expanded = [Environment]::ExpandEnvironmentVariables($raw)
 # YAML treats backslash as escape; use forward slashes for Windows paths
 $expanded = $expanded -replace '\\', '/'
@@ -79,8 +79,8 @@ Write-Host "Installing base detection collection..."
 
 Write-Host "Installing network attack demo detection..."
 $demoDir = Join-Path $RepoRoot "config\demo"
-Copy-Item (Join-Path $demoDir "sasikiran-net-logs.yaml") (Join-Path $configDir "parsers\s01-parse\sasikiran-net-logs.yaml") -Force
-Copy-Item (Join-Path $demoDir "sasikiran-net-flood.yaml") (Join-Path $configDir "scenarios\sasikiran-net-flood.yaml") -Force
+Copy-Item (Join-Path $demoDir "cybersec-net-logs.yaml") (Join-Path $configDir "parsers\s01-parse\cybersec-net-logs.yaml") -Force
+Copy-Item (Join-Path $demoDir "cybersec-net-flood.yaml") (Join-Path $configDir "scenarios\cybersec-net-flood.yaml") -Force
 
 Write-Host ""
 Write-Host "Setup complete!"

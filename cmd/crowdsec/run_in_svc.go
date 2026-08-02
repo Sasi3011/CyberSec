@@ -1,4 +1,4 @@
-//go:build !windows
+﻿//go:build !windows
 
 package main
 
@@ -37,7 +37,7 @@ func StartRunSvc(
 		log.Warn("pprof block/mutex profiling enabled, expect a performance hit")
 	}
 
-	log.Infof("Crowdsec %s", version.String())
+	log.Infof("CyberSec %s", version.String())
 
 	agentReady := make(chan bool, 1)
 

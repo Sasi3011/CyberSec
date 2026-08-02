@@ -1,4 +1,4 @@
-type: email           # Don't change
+﻿type: email           # Don't change
 name: email_default   # Must match the registered plugin in the profile
 
 # One of "trace", "debug", "info", "warn", "error", "off"
@@ -19,7 +19,7 @@ format: |
   {{range . -}}
     {{$alert := . -}}
     {{range .Decisions -}}
-      <p><a href="https://www.whois.com/whois/{{.Value}}">{{.Value}}</a> will get <b>{{.Type}}</b> for next <b>{{.Duration}}</b> for triggering <b>{{.Scenario}}</b> on machine <b>{{$alert.MachineID}}</b>.</p> <p><a href="https://app.crowdsec.net/cti/{{.Value}}">CrowdSec CTI</a></p>
+      <p><a href="https://www.whois.com/whois/{{.Value}}">{{.Value}}</a> will get <b>{{.Type}}</b> for next <b>{{.Duration}}</b> for triggering <b>{{.Scenario}}</b> on machine <b>{{$alert.MachineID}}</b>.</p> <p><a href="CyberSec Cloud Console">CyberSec CTI</a></p>
     {{end -}}
   {{end -}}
   </body></html>
@@ -29,9 +29,9 @@ smtp_username:        # Replace with your actual username
 smtp_password:        # Replace with your actual password
 smtp_port:            # Common values are any of [25, 465, 587, 2525]
 auth_type:            # Valid choices are "none", "crammd5", "login", "plain"
-sender_name: "CrowdSec"
+sender_name: "CyberSec"
 sender_email:         # example: foo@gmail.com
-email_subject: "CrowdSec Notification"
+email_subject: "CyberSec notification"
 receiver_emails:
 # - email1@gmail.com
 # - email2@gmail.com

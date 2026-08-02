@@ -1,14 +1,19 @@
-// Package branding holds display names for the SasikiranSec platform.
+// Package branding holds display names for the CyberSec platform.
 package branding
 
 const (
-	PlatformName = "SasikiranSec"
-	PlatformSlug = "sasikiransec"
-	CLIName      = "sscli"
-	AuthorName   = "Sasikiran"
-	ServiceName  = "SasikiranSec"
-	ServiceDesc  = "SasikiranSec IPS/IDS Security Engine by Sasikiran"
-	DataDirName  = "SasikiranSec"
-	CentralAPI   = "SasikiranSec Central API"
-	LocalAPI     = "SasikiranSec Local API"
+	PlatformName   = "CyberSec"
+	PlatformSlug   = "cybersec"
+	CLIName        = "cybercli"
+	AuthorName     = "CyberSec"
+	ServiceName    = "CyberSec"
+	ServiceDesc    = "CyberSec IPS/IDS Security Engine"
+	DataDirName    = "CyberSec"
+	CentralAPI     = "CyberSec Central API"
+	LocalAPI       = "CyberSec Local API"
+	CloudConsole   = "CyberSec Cloud Console"
+	HubName        = "CyberSec Hub"
+	CTIName        = "CyberSec CTI"
+	AgentLabel     = "CyberSec agent"
+	LogPrefix      = "cybersec"
 )

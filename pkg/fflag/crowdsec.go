@@ -1,4 +1,4 @@
-package fflag
+﻿package fflag
 
 import "runtime"
 
@@ -13,7 +13,7 @@ var (
 	// This one is only available on OS where RE2 support is enabled by default (linux only at the moment)
 	Re2DisableGrokSupport  = &Feature{Name: "re2_disable_grok_support", Description: "Disable RE2 support for GROK patterns (linux only)"}
 	Re2RegexpInfileSupport = &Feature{Name: "re2_regexp_in_file_support", Description: "Enable RE2 support for RegexpInFile expr helper"}
-	PProfBlockProfile      = &Feature{Name: "pprof_block_profile", Description: "Enable pprof block/mutex profiling. Do not use unless instructed by CrowdSec support"}
+	PProfBlockProfile      = &Feature{Name: "pprof_block_profile", Description: "Enable pprof block/mutex profiling. Do not use unless instructed by CyberSec support"}
 )
 
 //revive:disable:if-return

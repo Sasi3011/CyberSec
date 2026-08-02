@@ -1,5 +1,5 @@
-# SasikiranSec - Build script for Windows
-# Builds sasikiransec.exe and sscli.exe into bin/
+﻿# CyberSec - Build script for Windows
+# Builds cybersec.exe and cybercli.exe into bin/
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -29,19 +29,19 @@ $buildDate = Get-Date -Format "yyyy-MM-dd_HH:mm:ss"
 $ldflags = "-s " +
     "-X github.com/crowdsecurity/go-cs-lib/version.Version=$version " +
     "-X github.com/crowdsecurity/go-cs-lib/version.BuildDate=$buildDate " +
-    "-X github.com/crowdsecurity/crowdsec/pkg/cwversion.Codename=Sasikiran"
+    "-X github.com/crowdsecurity/crowdsec/pkg/cwversion.Codename=CyberSec"
 
-Write-Host "Building SasikiranSec engine..."
-go build -trimpath -tags $tags -ldflags $ldflags -o "$RepoRoot\bin\sasikiransec.exe" ./cmd/crowdsec
-if ($LASTEXITCODE -ne 0) { throw "sasikiransec build failed" }
+Write-Host "Building CyberSec engine..."
+go build -trimpath -tags $tags -ldflags $ldflags -o "$RepoRoot\bin\cybersec.exe" ./cmd/crowdsec
+if ($LASTEXITCODE -ne 0) { throw "cybersec build failed" }
 
-Write-Host "Building sscli..."
-go build -trimpath -tags $tags -ldflags $ldflags -o "$RepoRoot\bin\sscli.exe" ./cmd/crowdsec-cli
-if ($LASTEXITCODE -ne 0) { throw "sscli build failed" }
+Write-Host "Building cybercli..."
+go build -trimpath -tags $tags -ldflags $ldflags -o "$RepoRoot\bin\cybercli.exe" ./cmd/crowdsec-cli
+if ($LASTEXITCODE -ne 0) { throw "cybercli build failed" }
 
 Write-Host ""
 Write-Host "Build complete!"
-Write-Host "  bin\sasikiransec.exe  - SasikiranSec security engine"
-Write-Host "  bin\sscli.exe         - SasikiranSec CLI"
+Write-Host "  bin\cybersec.exe  - CyberSec security engine"
+Write-Host "  bin\cybercli.exe         - CyberSec CLI"
 Write-Host ""
 Write-Host "Next: .\scripts\run.ps1 setup"

@@ -1,0 +1,12 @@
+﻿name: cybersec/demo
+parsers:
+  - cybersec/net-logs
+scenarios:
+  - cybersec/net-flood
+description: "CyberSec two-device network attack demo detection"
+labels:
+  label: "CyberSec Network Attack Demo"
+author: cybersec
+tags:
+  - demo
+  - network

@@ -1,4 +1,4 @@
-//go:build linux
+﻿//go:build linux
 
 package main
 
@@ -16,7 +16,7 @@ func NewCLIDashboard() *cliDashboard {
 	return &cliDashboard{}
 }
 
-var ErrDashboardDeprecated = errors.New("command 'dashboard' has been removed, please read https://docs.crowdsec.net/blog/cscli_dashboard_deprecation/")
+var ErrDashboardDeprecated = errors.New("command 'dashboard' has been removed; use the CyberSec local web dashboard instead")
 
 func (*cliDashboard) NewCommand() *cobra.Command {
 	cmd := &cobra.Command{

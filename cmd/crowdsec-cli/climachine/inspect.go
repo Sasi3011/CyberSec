@@ -1,4 +1,4 @@
-package climachine
+﻿package climachine
 
 import (
 	"encoding/csv"
@@ -88,7 +88,7 @@ func (cli *cliMachines) inspectHuman(out io.Writer, machine *ent.Machine) {
 		{"Last Update", machine.UpdatedAt},
 		{"Last Heartbeat", machine.LastHeartbeat},
 		{"Validated?", machine.IsValidated},
-		{"CrowdSec version", machine.Version},
+		{"CyberSec version", machine.Version},
 		{"OS", clientinfo.GetOSNameAndVersion(machine)},
 		{"Auth type", machine.AuthType},
 	})

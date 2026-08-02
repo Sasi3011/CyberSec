@@ -1,4 +1,4 @@
-package csconfig
+﻿package csconfig
 
 import (
 	"bytes"
@@ -335,11 +335,11 @@ func (c *LocalApiServerCfg) ClientURL() string {
 
 func (c *Config) LoadAPIServer(inCli bool, skipOnlineCreds bool) error {
 	if c.DisableAPI {
-		log.Warning("crowdsec local API is disabled from flag")
+		log.Warning("CyberSec Local API is disabled from flag")
 	}
 
 	if c.API.Server == nil {
-		log.Warning("crowdsec local API is disabled")
+		log.Warning("CyberSec Local API is disabled")
 
 		c.DisableAPI = true
 
@@ -352,7 +352,7 @@ func (c *Config) LoadAPIServer(inCli bool, skipOnlineCreds bool) error {
 	}
 
 	if !*c.API.Server.Enable {
-		log.Warning("crowdsec local API is disabled because 'enable' is set to false")
+		log.Warning("CyberSec Local API is disabled because 'enable' is set to false")
 
 		c.DisableAPI = true
 	}
@@ -488,7 +488,7 @@ func (c *LocalApiServerCfg) LoadCapiWhitelists() error {
 		return nil
 	}
 
-	log.Warn("capi_whitelists_path is deprecated, please use centralized allowlists instead. See https://docs.crowdsec.net/docs/next/local_api/centralized_allowlists.")
+	log.Warn("capi_whitelists_path is deprecated, please use centralized allowlists instead. See CyberSec documentation")
 
 	fd, err := os.Open(c.CapiWhitelistsPath)
 	if err != nil {

@@ -1,4 +1,4 @@
-ifeq ($(OS), Windows_NT)
+﻿ifeq ($(OS), Windows_NT)
 	SHELL := pwsh.exe
 	.SHELLFLAGS := -NoProfile -Command
 	EXT = .exe
@@ -8,7 +8,7 @@ GO = go
 GOBUILD = $(GO) build
 GOTEST = $(GO) test
 
-CROWDSEC_BIN = sasikiransec$(EXT)
+CROWDSEC_BIN = cybersec$(EXT)
 # names longer than 15 chars break 'pgrep'
 
 .PHONY: all

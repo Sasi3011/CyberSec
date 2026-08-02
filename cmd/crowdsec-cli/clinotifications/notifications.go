@@ -1,4 +1,4 @@
-package clinotifications
+﻿package clinotifications
 
 import (
 	"context"
@@ -298,9 +298,9 @@ func (cli *cliNotifications) newTestCmd() *cobra.Command {
 			}
 
 			if cfg.API.CTI != nil && cfg.API.CTI.Enabled != nil && *cfg.API.CTI.Enabled {
-				log.Infof("Crowdsec CTI helper enabled")
+				log.Infof("CyberSec CTI helper enabled")
 				if err := ctiexpr.InitCrowdsecCTI(cfg.API.CTI.Key, cfg.API.CTI.CacheTimeout, cfg.API.CTI.CacheSize, cfg.API.CTI.LogLevel); err != nil {
-					log.Errorf("failed to init crowdsec cti: %s", err)
+					log.Errorf("failed to init CyberSec CTI: %s", err)
 				}
 			}
 
@@ -429,9 +429,9 @@ cscli notifications reinject <alert_id> -a '{"remediation": true,"scenario":"not
 			}
 
 			if cfg.API.CTI != nil && cfg.API.CTI.Enabled != nil && *cfg.API.CTI.Enabled {
-				log.Infof("Crowdsec CTI helper enabled")
+				log.Infof("CyberSec CTI helper enabled")
 				if err := ctiexpr.InitCrowdsecCTI(cfg.API.CTI.Key, cfg.API.CTI.CacheTimeout, cfg.API.CTI.CacheSize, cfg.API.CTI.LogLevel); err != nil {
-					log.Errorf("failed to init crowdsec cti: %s", err)
+					log.Errorf("failed to init CyberSec CTI: %s", err)
 				}
 			}
 

@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/eventlog"
 
+	"github.com/crowdsecurity/crowdsec/pkg/branding"
 	"github.com/crowdsecurity/crowdsec/pkg/csconfig"
 )
 
@@ -72,7 +73,7 @@ func (m *crowdsec_winservice) Execute(args []string, r <-chan svc.ChangeRequest,
 
 func runService(name string, sd *StateDumper) error {
 	// All the calls to logging before the logger is configured are pretty much useless, but we keep them for clarity
-	err := eventlog.InstallAsEventCreate("CrowdSec", eventlog.Error|eventlog.Warning|eventlog.Info)
+	err := eventlog.InstallAsEventCreate(branding.ServiceName, eventlog.Error|eventlog.Warning|eventlog.Info)
 	if err != nil {
 		if errno, ok := err.(windows.Errno); ok { //nolint:errorlint
 			if errno == windows.ERROR_ACCESS_DENIED {
@@ -89,7 +90,7 @@ func runService(name string, sd *StateDumper) error {
 	// - It could have been created earlier
 	// - No permission to create it (e.g. running as non-admin when working on crowdsec)
 	// It will still work, windows will just display some additional errors in the event log
-	evtlog, err := eventlog.Open("CrowdSec")
+	evtlog, err := eventlog.Open(branding.ServiceName)
 
 	if err == nil {
 		// Send panic and fatal to event log, as they can happen before the logger is configured.

@@ -1,4 +1,4 @@
-package metrics
+﻿package metrics
 
 import (
 	"github.com/crowdsecurity/go-cs-lib/version"
@@ -58,7 +58,7 @@ const GlobalCsInfoMetricName = "cs_info"
 var GlobalCsInfo = prometheus.NewGauge(
 	prometheus.GaugeOpts{
 		Name:        GlobalCsInfoMetricName,
-		Help:        "Information about Crowdsec.",
+		Help:        "Information about CyberSec.",
 		ConstLabels: prometheus.Labels{"version": version.String()},
 	},
 )

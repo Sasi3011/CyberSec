@@ -1,0 +1,18 @@
+﻿# CyberSec Web UI - standard local dashboard for CyberSec LAPI
+# https://github.com/TheDuffman85/cybersec-web-ui
+#
+# CyberSec removed their old official local UI (cscli dashboard / Metabase).
+# This is the community dashboard used to view alerts locally.
+
+services:
+  cybersec-web-ui:
+    image: ghcr.io/theduffman85/cybersec-web-ui:latest
+    container_name: cybersec_web_ui
+    ports:
+      - "3001:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./.local/cybersec-web-ui/data:/app/data
+      - ./.local/cybersec-web-ui/secrets/cybersec_password.txt:/run/secrets/cybersec_password:ro
+    restart: unless-stopped

@@ -1,6 +1,6 @@
-package require
+﻿package require
 
-// Set the appropriate hub branch according to config settings and crowdsec version
+// Set the appropriate hub branch according to config settings and CyberSec version
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	"github.com/crowdsecurity/crowdsec/pkg/cwversion"
 )
 
-// lookupLatest returns the latest crowdsec version based on github
+// lookupLatest returns the latest CyberSec version based on github
 func lookupLatest(ctx context.Context) (string, error) {
 	bo := backoff.NewConstantBackOff(1 * time.Second)
 
@@ -85,27 +85,27 @@ func chooseBranch(ctx context.Context, cfg *csconfig.Config) (string, error) {
 
 	csVersion := cwversion.BaseVersion()
 	if csVersion == "" {
-		log.Warning("Crowdsec version is not set, using hub branch 'master'")
+		log.Warning("CyberSec version is not set, using hub branch 'master'")
 		return "master", nil
 	}
 
 	latest, err := lookupLatest(ctx)
 	if err != nil {
-		return "", fmt.Errorf("unable to retrieve latest crowdsec version: %w", err)
+		return "", fmt.Errorf("unable to retrieve latest CyberSec version: %w", err)
 	}
 
 	if csVersion == latest {
-		log.Debugf("Latest crowdsec version (%s), using hub branch 'master'", version.String())
+		log.Debugf("Latest CyberSec version (%s), using hub branch 'master'", version.String())
 		return "master", nil
 	}
 
 	// if current version is greater than the latest we are in pre-release
 	if semver.Compare(csVersion, latest) == 1 {
-		log.Debugf("Your current crowdsec version seems to be a pre-release (%s), using hub branch 'master'", version.String())
+		log.Debugf("Your current CyberSec version seems to be a pre-release (%s), using hub branch 'master'", version.String())
 		return "master", nil
 	}
 
-	log.Warnf("A new CrowdSec release is available (%s). "+
+	log.Warnf("A new CyberSec release is available (%s). "+
 		"Your version is '%s'. Please update it to use new parsers/scenarios/collections.",
 		latest, csVersion)
 
@@ -113,7 +113,7 @@ func chooseBranch(ctx context.Context, cfg *csconfig.Config) (string, error) {
 }
 
 // HubBranch sets the branch (in cscli config) and returns its value
-// It can be "master", or the branch corresponding to the current crowdsec version, or the value overridden in config/flag
+// It can be "master", or the branch corresponding to the current CyberSec version, or the value overridden in config/flag
 func HubBranch(ctx context.Context, cfg *csconfig.Config) (string, error) {
 	branch, err := chooseBranch(ctx, cfg)
 	if err != nil {

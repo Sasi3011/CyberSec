@@ -1,4 +1,4 @@
-package apiserver
+﻿package apiserver
 
 import (
 	"bufio"
@@ -659,7 +659,7 @@ func (a *apic) PullTop(ctx context.Context, forcePull bool) error {
 		}
 	} else {
 		if a.pullCommunity {
-			log.Info("capi/community-blocklist : received 0 new entries (expected if you just installed crowdsec)")
+			log.Info("capi/community-blocklist : received 0 new entries (expected if you just installed CyberSec)")
 		} else {
 			log.Debug("capi/community-blocklist : community blocklist pull is disabled")
 		}
@@ -853,7 +853,7 @@ func (a *apic) ApplyApicWhitelists(ctx context.Context, decisions []*models.Deci
 	}
 
 	if a.whitelists != nil && (len(a.whitelists.Cidrs) > 0 || len(a.whitelists.Ips) > 0) {
-		log.Warn("capi_whitelists_path is deprecated, please use centralized allowlists instead. See https://docs.crowdsec.net/docs/next/local_api/centralized_allowlists.")
+		log.Warn("capi_whitelists_path is deprecated, please use centralized allowlists instead. See CyberSec documentation")
 	}
 
 	if (a.whitelists == nil || len(a.whitelists.Cidrs) == 0 && len(a.whitelists.Ips) == 0) && len(allowlisted_ips) == 0 && len(allowlisted_cidrs) == 0 {

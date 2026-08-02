@@ -1,9 +1,9 @@
-# SasikiranSec — Two-Device Automatic Attack Demo
+﻿# CyberSec — Two-Device Automatic Attack Demo
 
 This guide runs a **real automatic detection and block** demo across two devices on the same Wi-Fi.
 
 **What happens:**
-1. **Host** runs SasikiranSec (engine + honeypot + firewall bouncer + dashboard)
+1. **Host** runs CyberSec (engine + honeypot + firewall bouncer + dashboard)
 2. **Remote device** runs an attack script (port scan + TCP flood)
 3. **Host detects automatically** — logs → engine → ban decision → Windows Firewall → dashboard updates
 
@@ -20,7 +20,7 @@ Remote device  --port scan + flood-->  Host honeypot (:9999)
                                     attack.log (syslog)
                                               |
                                               v
-                                    SasikiranSec engine
+                                    CyberSec engine
                                     (leaky bucket scenario)
                                               |
                               +---------------+---------------+
@@ -51,13 +51,13 @@ Remote device  --port scan + flood-->  Host honeypot (:9999)
 
 | Component | Port | Role |
 |-----------|------|------|
-| `sasikiransec.exe` | 8080 | Detection engine + Local API |
+| `cybersec.exe` | 8080 | Detection engine + Local API |
 | Dashboard (UI) | 3000 | Live alerts and bans |
 | Prometheus metrics | 6060 | Engine metrics (`/metrics`) |
 | Attack honeypot | 9999 | TCP server — logs every connection to `attack.log` |
 | Firewall bouncer | — | Polls API, creates Windows Firewall block rules |
 
-**Detection scenario:** `sasikiran/net-flood` — triggers when 6+ attack events from the same IP arrive within 5 seconds (port scan + flood pattern).
+**Detection scenario:** `cybersec/net-flood` — triggers when 6+ attack events from the same IP arrive within 5 seconds (port scan + flood pattern).
 
 ---
 
@@ -66,7 +66,7 @@ Remote device  --port scan + flood-->  Host honeypot (:9999)
 Open **PowerShell as Administrator**:
 
 ```powershell
-cd C:\Users\Sasikiran\Documents\crowdsec
+cd C:\Users\CyberSec\Documents\crowdsec
 .\scripts\run.ps1 setup
 ```
 
@@ -79,7 +79,7 @@ Wait for: `Setup complete`
 ## Part 2 — Start the Host (Keep Window Open)
 
 ```powershell
-cd C:\Users\Sasikiran\Documents\crowdsec
+cd C:\Users\CyberSec\Documents\crowdsec
 .\scripts\run.ps1 start
 ```
 
@@ -90,7 +90,7 @@ cd C:\Users\Sasikiran\Documents\crowdsec
 You should see:
 
 ```
-SasikiranSec RUNNING
+CyberSec RUNNING
   Dashboard:   http://127.0.0.1:3000
   Your LAN IP: 172.17.11.200
   Test port:   9999
@@ -113,7 +113,7 @@ Look for `cs_*` counters increasing as attacks are processed.
 On host (second PowerShell window):
 
 ```powershell
-cd C:\Users\Sasikiran\Documents\crowdsec
+cd C:\Users\CyberSec\Documents\crowdsec
 .\scripts\run.ps1 export
 ```
 
@@ -147,7 +147,7 @@ Replace `172.17.11.200` with the host LAN IP from Part 2.
 ### Expected output (remote)
 
 ```
-===== SasikiranSec Remote ATTACK =====
+===== CyberSec Remote ATTACK =====
 
   Your IP:   172.17.11.55
   Target:    172.17.11.200
@@ -189,7 +189,7 @@ Use this when the attacker is **not on the same Wi-Fi** (e.g. phone on **4G/mobi
 This shows:
 - Your **public IP** (give this to the phone)
 - Your **LAN IP** (for router config)
-- Saves `SasikiranSec-CROSS-NETWORK.txt` and `mobile-flood.sh` to Desktop
+- Saves `CyberSec-CROSS-NETWORK.txt` and `mobile-flood.sh` to Desktop
 
 3. On your **home router**, add port forward:
 
@@ -245,7 +245,7 @@ bash mobile-flood.sh YOUR_PUBLIC_IP 9999 25
 | Panel | What appears |
 |-------|----------------|
 | **Active Alerts** | Count increases |
-| **Alerts table** | IP + reason `sasikiran/net-flood` or **Network Port Scan / Flood** |
+| **Alerts table** | IP + reason `cybersec/net-flood` or **Network Port Scan / Flood** |
 | **Ban Decisions** | Attacker IP with action `ban` |
 | **Active Bans** | Count increases |
 
@@ -261,10 +261,10 @@ Expected:
 
 ```
 --- Ban decisions ---
-| 172.17.11.55 | ban | sasikiran/net-flood | 4h |
+| 172.17.11.55 | ban | cybersec/net-flood | 4h |
 
 --- Firewall rules ---
-    SasikiranSec-Block-172-17-11-55 -> 172.17.11.55
+    CyberSec-Block-172-17-11-55 -> 172.17.11.55
 ```
 
 ### Verify block (remote device)
@@ -316,7 +316,7 @@ Watch the dashboard — alert and ban appear automatically for that IP.
 
 ## What to Say to the Judge (45 seconds)
 
-> "This is SasikiranSec — a security platform that detects and blocks malicious IPs.
+> "This is CyberSec — a security platform that detects and blocks malicious IPs.
 >
 > On the host we run the detection engine, a honeypot on port 9999, and a Windows Firewall bouncer. Prometheus metrics run on port 6060 for observability.
 >
@@ -341,10 +341,10 @@ scripts/lib/test-server.ps1  (honeypot)
 Engine reads attack.log (acquis.yaml)
         |
         v
-Parser: sasikiran/net-logs  ->  meta.log_type = sasikiran_net_attack
+Parser: cybersec/net-logs  ->  meta.log_type = cybersec_net_attack
         |
         v
-Scenario: sasikiran/net-flood  (6 events / 5 sec / same IP)
+Scenario: cybersec/net-flood  (6 events / 5 sec / same IP)
         |
         v
 Profile: default_ip_remediation  ->  ban 4h
@@ -405,7 +405,7 @@ bouncer-worker.ps1  -->  Windows Firewall rule  -->  IP blocked
 
 1. Check honeypot is running: `run.ps1 start` window open
 2. Check attack log growing: `.local\logs\attack.log` should have new lines
-3. Re-run setup: `.\scripts\run.ps1 setup` (installs `sasikiran/demo` collection)
+3. Re-run setup: `.\scripts\run.ps1 setup` (installs `cybersec/demo` collection)
 4. Restart: `stop` then `start`
 
 ### Ban appears but no firewall rule
@@ -440,7 +440,7 @@ Safe to ignore — detection and blocking still work.
 | `scripts/lib/bouncer-worker.ps1` | Firewall bouncer |
 | `scripts/lib/ui-server.ps1` | Dashboard server |
 | `.local/logs/attack.log` | Live attack log (engine reads this) |
-| `config/demo/sasikiran-net-flood.yaml` | Detection scenario |
+| `config/demo/cybersec-net-flood.yaml` | Detection scenario |
 | `ui/index.html` | Dashboard UI |
 
 For full project documentation see [instruction.md](instruction.md).

@@ -1,4 +1,4 @@
-package cliconsole
+﻿package cliconsole
 
 import (
 	"context"
@@ -42,7 +42,7 @@ func New(cfg csconfig.Getter) *cliConsole {
 func (cli *cliConsole) NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "console [action]",
-		Short:             "Manage interaction with Crowdsec console (https://app.crowdsec.net)",
+		Short:             "Manage interaction with the CyberSec Cloud Console",
 		DisableAutoGenTag: true,
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			cfg := cli.cfg()
@@ -97,7 +97,7 @@ func (cli *cliConsole) enroll(ctx context.Context, key string, name string, over
 
 	if rawResp.Response.StatusCode == http.StatusOK {
 		if autoEnroll {
-			log.Warn("The instance is already enrolled in an organization; transfer it using https://app.crowdsec.net/.")
+			log.Warn("The instance is already enrolled in an organization; transfer it using CyberSec Cloud Console")
 			return nil
 		}
 		if !overwrite {
@@ -110,11 +110,11 @@ func (cli *cliConsole) enroll(ctx context.Context, key string, name string, over
 		bold := color.New(color.Bold)
 		log.Infof("Please visit the following URL to enroll your instance: %s", bold.Sprint(autoResp.Url))
 		log.Infof("This link is valid for the next %s.", time.Until(time.UnixMilli(autoResp.ExpiresAt)).Round(time.Minute))
-		log.Info("Please restart crowdsec after accepting the enrollment.")
+		log.Info("Please restart CyberSec after accepting the enrollment.")
 
 	} else {
-		log.Info("Watcher successfully enrolled. Visit https://app.crowdsec.net to accept it.")
-		log.Info("Please restart crowdsec after accepting the enrollment.")
+		log.Info("Watcher successfully enrolled. Visit CyberSec Cloud Console to accept it.")
+		log.Info("Please restart CyberSec after accepting the enrollment.")
 	}
 
 	if err := cli.setConsoleOpts(opts, true); err != nil {
@@ -205,11 +205,11 @@ func (cli *cliConsole) newEnrollCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "enroll [enroll-key]",
-		Short: "Enroll this instance to https://app.crowdsec.net [requires local API]",
+		Short: "Enroll this instance to CyberSec Cloud Console [requires local API]",
 		Long: `
-Enroll this instance to https://app.crowdsec.net
+Enroll this instance to CyberSec Cloud Console
 		
-You can get your enrollment key by creating an account on https://app.crowdsec.net.
+You can get your enrollment key by creating an account on CyberSec Cloud Console
 After running this command your will need to validate the enrollment in the webapp.`,
 		Example: fmt.Sprintf(`cscli console enroll YOUR-ENROLL-KEY
 cscli console enroll --quick
@@ -255,7 +255,7 @@ valid options are : %s,all (see 'cscli console status' for details)`, strings.Jo
 	flags.StringSliceVarP(&tags, "tags", "t", tags, "Tags to display in the console")
 	flags.StringSliceVarP(&enableOpts, "enable", "e", enableOpts, "Enable console options")
 	flags.StringSliceVarP(&disableOpts, "disable", "d", disableOpts, "Disable console options")
-	flags.BoolVarP(&quickEnroll, "quick", "q", false, "Enrolls the instance without an enroll key by visiting a link to the CrowdSec console.")
+	flags.BoolVarP(&quickEnroll, "quick", "q", false, "Enrolls the instance without an enroll key by visiting a link to the CyberSec Cloud Console.")
 
 	return cmd
 }

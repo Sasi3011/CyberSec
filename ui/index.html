@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>SasikiranSec — Security Dashboard</title>
+  <title>CyberSec — Security Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
@@ -252,7 +252,7 @@
     <div class="sidebar-brand">
       <div class="sidebar-logo">SS</div>
       <div>
-        <div class="sidebar-name">SasikiranSec</div>
+        <div class="sidebar-name">CyberSec</div>
         <div class="sidebar-sub">Security Platform</div>
       </div>
     </div>
@@ -363,7 +363,7 @@
       <!-- BANS & UNBLOCK -->
       <section class="page" id="page-bans">
         <div class="info-banner">
-          <strong>Global Unblock</strong> removes the ban from the SasikiranSec engine <em>and</em> deletes the Windows Firewall block rule instantly.
+          <strong>Global Unblock</strong> removes the ban from the CyberSec engine <em>and</em> deletes the Windows Firewall block rule instantly.
           After unblocking, the remote device can run <code style="background:#fff;padding:2px 6px;border-radius:4px;font-size:0.8rem">.\run.ps1 attack -HostIp &lt;your-ip&gt;</code> again.
         </div>
         <div id="unban-result"></div>
@@ -657,7 +657,7 @@ function initCharts() {
 }
 
 function shortScenario(s) {
-  return (s || '').replace('crowdsecurity/', '').replace('sasikiransec/', '').replace(/-/g, ' ').trim() || 'unknown';
+  return (s || '').replace('crowdsecurity/', '').replace('cybersec/', '').replace(/-/g, ' ').trim() || 'unknown';
 }
 
 function ensureArray(data) {
@@ -877,7 +877,7 @@ function renderFeatures() {
     ['File Acquisition','Real-time log ingestion',1],['Syslog Parser','sshd-logs GROK patterns',1],
     ['Leaky Bucket','ssh-bf, slow-bf, time-based-bf',1],['Local API','REST on :8080',1],
     ['SQLite Database','Persistent storage',1],['Prometheus','Metrics on :6060',1],
-    ['Firewall Bouncer','Windows block rules',1],['Hub Collections','crowdsecurity/sshd',1],
+    ['Firewall Bouncer','Windows block rules',1],['Hub Collections','SSH detection pack',1],
     ['Profiles','Auto-ban 4h on overflow',1],['Decision Stream','Bouncer LAPI sync',1],
     ['WAF AppSec','HTTP inspection ready',1],['Community Blocklist','Requires CAPI',0]
   ];

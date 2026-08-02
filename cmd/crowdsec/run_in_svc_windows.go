@@ -77,7 +77,7 @@ func WindowsRun(ctx context.Context, cConfig *csconfig.Config, sd *StateDumper) 
 		log.Warn("pprof block/mutex profiling enabled, expect a performance hit")
 	}
 
-	log.Infof("Crowdsec %s", version.String())
+	log.Infof("%s %s", branding.PlatformName, version.String())
 
 	agentReady := make(chan bool, 1)
 

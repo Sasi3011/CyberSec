@@ -1,4 +1,4 @@
-common:
+﻿common:
   log_media: stdout
   log_level: info
 config_paths:
@@ -18,7 +18,7 @@ cscli:
   output: human
 db_config:
   type: sqlite
-  db_path: "%DATA_DIR%/sasikiransec.db"
+  db_path: "%DATA_DIR%/cybersec.db"
 api:
   client:
     credentials_path: "%CONFIG_DIR%/local_api_credentials.yaml"

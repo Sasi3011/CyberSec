@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"context"
@@ -72,7 +72,7 @@ func reloadHandler(ctx context.Context, _ os.Signal) (*csconfig.Config, error) {
 
 		csParsers, datasources, err := initCrowdsec(ctx, cConfig, hub, false)
 		if err != nil {
-			return nil, fmt.Errorf("unable to init crowdsec: %w", err)
+			return nil, fmt.Errorf("unable to init CyberSec: %w", err)
 		}
 
 		// reload the simulation state
@@ -292,7 +292,7 @@ func HandleSignals(ctx context.Context, cConfig *csconfig.Config) error {
 
 	err := <-exitChan
 	if err == nil {
-		log.Warning("Crowdsec service shutting down")
+		log.Warning("CyberSec service shutting down")
 	}
 
 	if ok, werr := unregisterWatcher(ctx, cConfig); werr != nil {
@@ -338,16 +338,16 @@ func Serve(
 	}
 
 	if cConfig.API.CTI != nil && cConfig.API.CTI.Enabled != nil && *cConfig.API.CTI.Enabled {
-		log.Infof("Crowdsec CTI helper enabled")
+		log.Infof("CyberSec CTI helper enabled")
 
 		if err := ctiexpr.InitCrowdsecCTI(cConfig.API.CTI.Key, cConfig.API.CTI.CacheTimeout, cConfig.API.CTI.CacheSize, cConfig.API.CTI.LogLevel); err != nil {
-			return fmt.Errorf("failed to init crowdsec cti: %w", err)
+			return fmt.Errorf("failed to init CyberSec CTI: %w", err)
 		}
 	}
 
 	if !cConfig.DisableAPI {
 		if cConfig.API.Server.OnlineClient == nil || cConfig.API.Server.OnlineClient.Credentials == nil {
-			log.Warningf("Communication with CrowdSec Central API disabled from configuration file")
+		log.Warningf("Communication with %s disabled from configuration file", branding.CentralAPI)
 		}
 
 		if flags.DisableCAPI {

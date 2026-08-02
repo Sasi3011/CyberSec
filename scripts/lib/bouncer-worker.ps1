@@ -1,4 +1,4 @@
-# Internal worker - Windows Firewall bouncer (spawned by run.ps1 start)
+﻿# Internal worker - Windows Firewall bouncer (spawned by run.ps1 start)
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
@@ -27,7 +27,7 @@ function Add-BlockedIp {
     if (Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue) { return }
     New-NetFirewallRule `
         -DisplayName $name `
-        -Description "SasikiranSec ban for $Ip" `
+        -Description "CyberSec ban for $Ip" `
         -Direction Inbound `
         -Action Block `
         -RemoteAddress $Ip `
@@ -62,7 +62,7 @@ $apiKey = $cfg["api_key"]
 $endpoint = $cfg["api_endpoint"].TrimEnd('/')
 $interval = [int]$cfg["update_frequency"]
 if ($interval -lt 5) { $interval = 10 }
-$rulePrefix = if ($cfg["rule_prefix"]) { $cfg["rule_prefix"] } else { "SasikiranSec-Block" }
+$rulePrefix = if ($cfg["rule_prefix"]) { $cfg["rule_prefix"] } else { "CyberSec-Block" }
 $profiles = @("domain", "private", "public")
 
 $active = @{}

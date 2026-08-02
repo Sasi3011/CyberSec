@@ -1,4 +1,4 @@
-
+﻿
 ifneq ($(firstword $(sort $(MAKE_VERSION) 4.1)),4.1)
     $(error Your make is too old ($(MAKE_VERSION)). Please install GNU make >= 4.1)
 endif
@@ -63,8 +63,8 @@ CROWDSEC_FOLDER = ./cmd/crowdsec
 CSCLI_FOLDER = ./cmd/crowdsec-cli/
 PLUGINS_DIR_PREFIX = ./cmd/notification-
 
-CROWDSEC_BIN = sasikiransec$(EXT)
-CSCLI_BIN = sscli$(EXT)
+CROWDSEC_BIN = cybersec$(EXT)
+CSCLI_BIN = cybercli$(EXT)
 
 # semver comparison to select the hub branch requires the version to start with "v"
 ifneq ($(call substr,$(BUILD_VERSION),1,1),v)
