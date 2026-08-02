@@ -1,0 +1,127 @@
+package csconfig
+
+import (
+	"fmt"
+	"os"
+
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
+)
+
+const (
+	SEND_CUSTOM_SCENARIOS  = "custom"
+	SEND_TAINTED_SCENARIOS = "tainted"
+	SEND_MANUAL_SCENARIOS  = "manual"
+	CONSOLE_MANAGEMENT     = "console_management"
+	SEND_CONTEXT           = "context"
+)
+
+var CONSOLE_CONFIGS = []string{SEND_CUSTOM_SCENARIOS, SEND_MANUAL_SCENARIOS, SEND_TAINTED_SCENARIOS, SEND_CONTEXT, CONSOLE_MANAGEMENT}
+var CONSOLE_CONFIGS_HELP = map[string]string{
+	SEND_CUSTOM_SCENARIOS:  "Forward alerts from custom scenarios to the console",
+	SEND_MANUAL_SCENARIOS:  "Forward manual decisions to the console",
+	SEND_TAINTED_SCENARIOS: "Forward alerts from tainted scenarios to the console",
+	SEND_CONTEXT:           "Forward context with alerts to the console",
+	CONSOLE_MANAGEMENT:     "Receive decisions from console",
+}
+
+var DefaultConsoleConfigFilePath = DefaultConfigPath("console.yaml")
+
+type ConsoleConfig struct {
+	ShareManualDecisions  *bool `yaml:"share_manual_decisions"`
+	ShareTaintedScenarios *bool `yaml:"share_tainted"`
+	ShareCustomScenarios  *bool `yaml:"share_custom"`
+	ConsoleManagement     *bool `yaml:"console_management"`
+	ShareContext          *bool `yaml:"share_context"`
+}
+
+func (c *ConsoleConfig) EnabledOptions() []string {
+	ret := []string{}
+	if c == nil {
+		return ret
+	}
+
+	if c.ShareCustomScenarios != nil && *c.ShareCustomScenarios {
+		ret = append(ret, SEND_CUSTOM_SCENARIOS)
+	}
+
+	if c.ShareTaintedScenarios != nil && *c.ShareTaintedScenarios {
+		ret = append(ret, SEND_TAINTED_SCENARIOS)
+	}
+
+	if c.ShareManualDecisions != nil && *c.ShareManualDecisions {
+		ret = append(ret, SEND_MANUAL_SCENARIOS)
+	}
+
+	if c.ConsoleManagement != nil && *c.ConsoleManagement {
+		ret = append(ret, CONSOLE_MANAGEMENT)
+	}
+
+	if c.ShareContext != nil && *c.ShareContext {
+		ret = append(ret, SEND_CONTEXT)
+	}
+
+	return ret
+}
+
+func (c *ConsoleConfig) IsPAPIEnabled() bool {
+	if c == nil || c.ConsoleManagement == nil {
+		return false
+	}
+
+	return *c.ConsoleManagement
+}
+
+func (c *LocalApiServerCfg) LoadConsoleConfig() error {
+	c.ConsoleConfig = &ConsoleConfig{}
+	if _, err := os.Stat(c.ConsoleConfigPath); err != nil && os.IsNotExist(err) {
+		log.Debugf("no console configuration to load")
+
+		c.ConsoleConfig.ShareCustomScenarios = new(true)
+		c.ConsoleConfig.ShareTaintedScenarios = new(true)
+		c.ConsoleConfig.ShareManualDecisions = new(false)
+		c.ConsoleConfig.ConsoleManagement = new(false)
+		c.ConsoleConfig.ShareContext = new(false)
+
+		return nil
+	}
+
+	yamlFile, err := os.ReadFile(c.ConsoleConfigPath)
+	if err != nil {
+		return fmt.Errorf("reading console config file '%s': %w", c.ConsoleConfigPath, err)
+	}
+
+	err = yaml.Unmarshal(yamlFile, c.ConsoleConfig)
+	if err != nil {
+		return fmt.Errorf("parsing console config file '%s': %w", c.ConsoleConfigPath, err)
+	}
+
+	if c.ConsoleConfig.ShareCustomScenarios == nil {
+		log.Debugf("no share_custom scenarios found, setting to true")
+		c.ConsoleConfig.ShareCustomScenarios = new(true)
+	}
+
+	if c.ConsoleConfig.ShareTaintedScenarios == nil {
+		log.Debugf("no share_tainted scenarios found, setting to true")
+		c.ConsoleConfig.ShareTaintedScenarios = new(true)
+	}
+
+	if c.ConsoleConfig.ShareManualDecisions == nil {
+		log.Debugf("no share_manual scenarios found, setting to false")
+		c.ConsoleConfig.ShareManualDecisions = new(false)
+	}
+
+	if c.ConsoleConfig.ConsoleManagement == nil {
+		log.Debugf("no console_management found, setting to false")
+		c.ConsoleConfig.ConsoleManagement = new(false)
+	}
+
+	if c.ConsoleConfig.ShareContext == nil {
+		log.Debugf("no 'context' found, setting to false")
+		c.ConsoleConfig.ShareContext = new(false)
+	}
+
+	log.Debugf("Console configuration '%s' loaded successfully", c.ConsoleConfigPath)
+
+	return nil
+}

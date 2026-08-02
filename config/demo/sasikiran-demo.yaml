@@ -1,0 +1,12 @@
+name: sasikiran/demo
+parsers:
+  - sasikiran/net-logs
+scenarios:
+  - sasikiran/net-flood
+description: "SasikiranSec two-device network attack demo detection"
+labels:
+  label: "SasikiranSec Network Attack Demo"
+author: sasikiran
+tags:
+  - demo
+  - network

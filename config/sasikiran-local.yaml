@@ -1,0 +1,35 @@
+common:
+  log_media: stdout
+  log_level: info
+config_paths:
+  config_dir: "%CONFIG_DIR%"
+  data_dir: "%DATA_DIR%"
+  notification_dir: "%CONFIG_DIR%/notifications/"
+  plugin_dir: "%PLUGINS_DIR%"
+  hub_dir: "%CONFIG_DIR%/hub"
+  index_path: "%CONFIG_DIR%/hub/.index.json"
+crowdsec_service:
+  acquisition_path: "%CONFIG_DIR%/acquis.yaml"
+  parser_routines: 1
+plugin_config:
+  user: "%USERNAME%"
+  group: "%USERNAME%"
+cscli:
+  output: human
+db_config:
+  type: sqlite
+  db_path: "%DATA_DIR%/sasikiransec.db"
+api:
+  client:
+    credentials_path: "%CONFIG_DIR%/local_api_credentials.yaml"
+  server:
+    console_path: "%CONFIG_DIR%/console.yaml"
+    listen_uri: 127.0.0.1:8080
+    profiles_path: "%CONFIG_DIR%/profiles.yaml"
+    online_client:
+      credentials_path: "%CONFIG_DIR%/online_api_credentials.yaml"
+prometheus:
+  enabled: true
+  level: full
+  listen_addr: 127.0.0.1
+  listen_port: 6060

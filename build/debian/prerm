@@ -1,0 +1,8 @@
+if [ "$1" = "remove" ]; then
+   systemctl stop crowdsec
+   systemctl disable crowdsec
+fi
+
+if [ "$1" = "upgrade" ]; then
+   systemctl stop crowdsec
+fi

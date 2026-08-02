@@ -1,0 +1,74 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*~
+.pc
+
+# IDEs
+.vscode
+.idea
+
+# If vendor is included, allow prebuilt (wasm?) libraries.
+!vendor/**/*.so
+
+# Test binaries, built with `go test -c`
+*.test
+*.cover
+
+# Test dependencies
+test/tools/*
+
+# Saved test status
+test/bats/.bats/run-logs
+
+# VMs used for dev/test
+
+.vagrant
+
+# Test binaries, built from *_test.go
+pkg/csplugin/tests/cs_plugin_test*
+
+# Output of test coverage
+coverage.out
+test/coverage/*
+
+# Environment files
+.env
+
+# Development artifacts, backups, etc
+*.swp
+*.swo
+
+# Dependencies are not vendored by default, but a tarball is created by "make vendor"
+# and provided in the release. Used by gentoo, etc.
+vendor/
+vendor.tgz
+
+# crowdsec binaries
+cmd/crowdsec-cli/cscli
+cmd/crowdsec/crowdsec
+cmd/notification-*/notification-*
+
+# Test cache (downloaded files)
+.cache
+
+# Release stuff
+crowdsec-v*
+msi
+*.msi
+**/*.nupkg
+*.tgz
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+
+# local agent/tooling dirs (not part of the repo)
+.agents/
+.claude/
+.worktrees/
+.local/

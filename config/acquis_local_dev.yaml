@@ -1,0 +1,5 @@
+# Real-time acquisition only - honeypot attack.log (no static sample data)
+filenames:
+  - %ATTACK_LOG%
+labels:
+  type: syslog

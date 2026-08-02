@@ -1,0 +1,86 @@
+package database
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	log "github.com/sirupsen/logrus"
+
+	"github.com/crowdsecurity/crowdsec/pkg/database/ent"
+	"github.com/crowdsecurity/crowdsec/pkg/database/ent/lock"
+)
+
+const (
+	CAPIPullLockTimeout = 10
+	CapiPullLockName    = "pullCAPI"
+)
+
+func (c *Client) AcquireLock(ctx context.Context, name string) error {
+	log.Debugf("acquiring lock %s", name)
+	_, err := c.Ent.Lock.Create().
+		SetName(name).
+		SetCreatedAt(time.Now().UTC()).
+		Save(ctx)
+
+	if ent.IsConstraintError(err) {
+		return err
+	}
+
+	if err != nil {
+		return fmt.Errorf("insert lock: %w: %w", err, InsertFail)
+	}
+
+	return nil
+}
+
+func (c *Client) ReleaseLock(ctx context.Context, name string) error {
+	log.Debugf("releasing lock %s", name)
+	_, err := c.Ent.Lock.Delete().Where(lock.NameEQ(name)).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("delete lock: %w: %w", err, DeleteFail)
+	}
+
+	return nil
+}
+
+func (c *Client) ReleaseLockWithTimeout(ctx context.Context, name string, timeout int) error {
+	log.Debugf("releasing lock %s with timeout of %d minutes", name, timeout)
+
+	_, err := c.Ent.Lock.Delete().Where(
+		lock.NameEQ(name),
+		lock.CreatedAtLT(time.Now().UTC().Add(-time.Duration(timeout)*time.Minute)),
+	).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("delete lock: %w: %w", err, DeleteFail)
+	}
+
+	return nil
+}
+
+func (*Client) IsLocked(err error) bool {
+	return ent.IsConstraintError(err)
+}
+
+func (c *Client) AcquirePullCAPILock(ctx context.Context) error {
+	// delete orphan "old" lock if present
+	err := c.ReleaseLockWithTimeout(ctx, CapiPullLockName, CAPIPullLockTimeout)
+	if err != nil {
+		log.Errorf("unable to release pullCAPI lock: %s", err)
+	}
+
+	return c.AcquireLock(ctx, CapiPullLockName)
+}
+
+func (c *Client) ReleasePullCAPILock(ctx context.Context) error {
+	log.Debugf("deleting lock %s", CapiPullLockName)
+
+	_, err := c.Ent.Lock.Delete().Where(
+		lock.NameEQ(CapiPullLockName),
+	).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("delete lock: %w: %w", err, DeleteFail)
+	}
+
+	return nil
+}

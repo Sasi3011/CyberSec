@@ -1,0 +1,770 @@
+package httpacquisition
+
+import (
+	"compress/gzip"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/tomb.v2"
+
+	"github.com/crowdsecurity/crowdsec/pkg/metrics"
+	"github.com/crowdsecurity/crowdsec/pkg/pipeline"
+)
+
+const (
+	testHTTPServerAddr    = "http://127.0.0.1:8080"
+	testHTTPServerAddrTLS = "https://127.0.0.1:8080"
+)
+
+func closeBody(t *testing.T, resp *http.Response) {
+	t.Helper()
+
+	if resp != nil && resp.Body != nil {
+		_ = resp.Body.Close()
+	}
+}
+
+func TestGetUuid(t *testing.T) {
+	h := Source{}
+	h.Config.UniqueId = "test"
+	assert.Equal(t, "test", h.GetUuid())
+}
+
+func TestGetMode(t *testing.T) {
+	h := Source{}
+	h.Config.Mode = "test"
+	assert.Equal(t, "test", h.GetMode())
+}
+
+func TestGetName(t *testing.T) {
+	h := Source{}
+	assert.Equal(t, "http", h.GetName())
+}
+
+func SetupAndRunHTTPSource(t *testing.T, h *Source, config []byte, metricLevel metrics.AcquisitionMetricsLevel) (chan pipeline.Event, *prometheus.Registry, *tomb.Tomb) {
+	ctx := t.Context()
+	subLogger := log.WithFields(log.Fields{
+		"type": ModuleName,
+	})
+	err := h.Configure(ctx, config, subLogger, metricLevel)
+	require.NoError(t, err)
+
+	tomb := tomb.Tomb{}
+	out := make(chan pipeline.Event)
+	err = h.StreamingAcquisition(ctx, out, &tomb)
+	require.NoError(t, err)
+
+	testRegistry := prometheus.NewPedanticRegistry()
+	for _, metric := range h.GetMetrics() {
+		err = testRegistry.Register(metric)
+		require.NoError(t, err)
+	}
+
+	return out, testRegistry, &tomb
+}
+
+func TestStreamingAcquisitionHTTPMethod(t *testing.T) {
+	h := &Source{}
+	_, _, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: basic_auth
+basic_auth:
+  username: test
+  password: test`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	ctx := t.Context()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, testHTTPServerAddr+"/test", http.NoBody)
+	require.NoError(t, err)
+
+	// Method validity is checked after auth
+	req.SetBasicAuth("test", "test")
+
+	res, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, res.StatusCode)
+	closeBody(t, res)
+
+	// Check that GET/HEAD requests return a 200
+
+	req, err = http.NewRequestWithContext(ctx, http.MethodGet, testHTTPServerAddr+"/test", http.NoBody)
+	require.NoError(t, err)
+	req.SetBasicAuth("test", "test")
+	res, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	closeBody(t, res)
+
+	req, err = http.NewRequestWithContext(ctx, http.MethodHead, testHTTPServerAddr+"/test", http.NoBody)
+	require.NoError(t, err)
+	req.SetBasicAuth("test", "test")
+	res, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	closeBody(t, res)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionUnknownPath(t *testing.T) {
+	ctx := t.Context()
+
+	h := &Source{}
+	_, _, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: basic_auth
+basic_auth:
+  username: test
+  password: test`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, testHTTPServerAddr+"/unknown", http.NoBody)
+	require.NoError(t, err)
+
+	res, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, res.StatusCode)
+	closeBody(t, res)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionBasicAuth(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	_, _, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: basic_auth
+basic_auth:
+  username: test
+  password: test`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	client := &http.Client{}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, testHTTPServerAddr+"/test", strings.NewReader("test"))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	closeBody(t, resp)
+
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, testHTTPServerAddr+"/test", strings.NewReader("test"))
+	require.NoError(t, err)
+	req.SetBasicAuth("test", "WrongPassword")
+
+	resp, err = client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	closeBody(t, resp)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionBadHeaders(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	_, _, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: headers
+headers:
+  key: test`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	client := &http.Client{}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddr), strings.NewReader("test"))
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "wrong")
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	closeBody(t, resp)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionMaxBodySize(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	_, _, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: headers
+headers:
+  key: test
+max_body_size: 5`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	client := &http.Client{}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddr), strings.NewReader("testtest"))
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "test")
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, resp.StatusCode)
+	closeBody(t, resp)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionSuccess(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	out, reg, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: headers
+headers:
+  key: test`), 2)
+
+	time.Sleep(1 * time.Second)
+
+	rawEvt := `{"test": "test"}`
+
+	errChan := make(chan error)
+	go assertEvents(out, []string{rawEvt}, errChan)
+
+	client := &http.Client{}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddr), strings.NewReader(rawEvt))
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "test")
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	closeBody(t, resp)
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	assertMetrics(t, reg, h.GetMetrics(), 1)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionCustomStatusCodeAndCustomHeaders(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	out, reg, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: headers
+headers:
+  key: test
+custom_status_code: 201
+custom_headers:
+  success: true`), 2)
+
+	time.Sleep(1 * time.Second)
+
+	rawEvt := `{"test": "test"}`
+	errChan := make(chan error)
+
+	go assertEvents(out, []string{rawEvt}, errChan)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddr), strings.NewReader(rawEvt))
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "test")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	assert.Equal(t, "true", resp.Header.Get("Success"))
+	closeBody(t, resp)
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	assertMetrics(t, reg, h.GetMetrics(), 1)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestAcquistionSocket(t *testing.T) {
+	tempDir := t.TempDir()
+	socketFile := filepath.Join(tempDir, "test.sock")
+
+	ctx := t.Context()
+	h := &Source{}
+	out, reg, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_socket: `+socketFile+`
+path: /test
+auth_type: headers
+headers:
+  key: test`), 2)
+
+	time.Sleep(1 * time.Second)
+	rawEvt := `{"test": "test"}`
+	errChan := make(chan error)
+	go assertEvents(out, []string{rawEvt}, errChan)
+
+	dialer := &net.Dialer{}
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return dialer.DialContext(ctx, "unix", socketFile)
+			},
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddr), strings.NewReader(rawEvt))
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "test")
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	closeBody(t, resp)
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	assertMetrics(t, reg, h.GetMetrics(), 1)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+type slowReader struct {
+	delay time.Duration
+	body  []byte
+	index int
+}
+
+func (sr *slowReader) Read(p []byte) (int, error) {
+	if sr.index >= len(sr.body) {
+		return 0, io.EOF
+	}
+
+	time.Sleep(sr.delay) // Simulate a delay in reading
+	n := copy(p, sr.body[sr.index:])
+	sr.index += n
+
+	return n, nil
+}
+
+func assertEvents(out chan pipeline.Event, expected []string, errChan chan error) {
+	readLines := []pipeline.Event{}
+
+	for range expected {
+		select {
+		case event := <-out:
+			readLines = append(readLines, event)
+		case <-time.After(2 * time.Second):
+			errChan <- errors.New("timeout waiting for event")
+			return
+		}
+	}
+
+	if len(readLines) != len(expected) {
+		errChan <- fmt.Errorf("expected %d lines, got %d", len(expected), len(readLines))
+		return
+	}
+
+	for i, evt := range readLines {
+		if evt.Line.Raw != expected[i] {
+			errChan <- fmt.Errorf(`expected %s, got '%+v'`, expected, evt.Line.Raw)
+			return
+		}
+
+		if evt.Line.Src != "127.0.0.1" {
+			errChan <- fmt.Errorf("expected '127.0.0.1', got '%s'", evt.Line.Src)
+			return
+		}
+
+		if evt.Line.Module != "http" {
+			errChan <- fmt.Errorf("expected 'http', got '%s'", evt.Line.Module)
+			return
+		}
+	}
+
+	errChan <- nil
+}
+
+func TestStreamingAcquisitionTimeout(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	_, _, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: headers
+headers:
+  key: test
+timeout: 1s`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	slow := &slowReader{
+		delay: 2 * time.Second,
+		body:  []byte(`{"test": "delayed_payload"}`),
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddr), slow)
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "test")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	closeBody(t, resp)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionTLSHTTPRequest(t *testing.T) {
+	ctx := t.Context()
+
+	h := &Source{}
+	_, _, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+auth_type: mtls
+path: /test
+tls:
+  server_cert: testdata/server.crt
+  server_key: testdata/server.key
+  ca_cert: testdata/ca.crt`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, testHTTPServerAddr+"/test", strings.NewReader("test"))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	closeBody(t, resp)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionTLSWithHeadersAuthSuccess(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	out, reg, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: headers
+headers:
+  key: test
+tls:
+  server_cert: testdata/server.crt
+  server_key: testdata/server.key
+`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	caCert, err := os.ReadFile("testdata/server.crt")
+	require.NoError(t, err)
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	rawEvt := `{"test": "test"}`
+	errChan := make(chan error)
+
+	go assertEvents(out, []string{rawEvt}, errChan)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddrTLS), strings.NewReader(rawEvt))
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "test")
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	closeBody(t, resp)
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	assertMetrics(t, reg, h.GetMetrics(), 0)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionMTLS(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	out, reg, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: mtls
+tls:
+  server_cert: testdata/server.crt
+  server_key: testdata/server.key
+  ca_cert: testdata/ca.crt`), 0)
+
+	time.Sleep(1 * time.Second)
+
+	// init client cert
+	cert, err := tls.LoadX509KeyPair("testdata/client.crt", "testdata/client.key")
+	require.NoError(t, err)
+
+	caCert, err := os.ReadFile("testdata/ca.crt")
+	require.NoError(t, err)
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	rawEvt := `{"test": "test"}`
+	errChan := make(chan error)
+
+	go assertEvents(out, []string{rawEvt}, errChan)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddrTLS), strings.NewReader(rawEvt))
+	require.NoError(t, err)
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	closeBody(t, resp)
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	assertMetrics(t, reg, h.GetMetrics(), 0)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionGzipData(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	out, reg, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: headers
+headers:
+  key: test`), 2)
+
+	time.Sleep(1 * time.Second)
+
+	rawEvt := `{"test": "test"}`
+	errChan := make(chan error)
+
+	go assertEvents(out, []string{rawEvt, rawEvt}, errChan)
+
+	var b strings.Builder
+	gz := gzip.NewWriter(&b)
+
+	_, err := gz.Write([]byte(rawEvt))
+	require.NoError(t, err)
+
+	_, err = gz.Write([]byte(rawEvt))
+	require.NoError(t, err)
+
+	err = gz.Close()
+	require.NoError(t, err)
+
+	// send gzipped compressed data
+	client := &http.Client{}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddr), strings.NewReader(b.String()))
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "test")
+	req.Header.Add("Content-Encoding", "gzip")
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	closeBody(t, resp)
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	assertMetrics(t, reg, h.GetMetrics(), 2)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func TestStreamingAcquisitionNDJson(t *testing.T) {
+	ctx := t.Context()
+	h := &Source{}
+	out, reg, tomb := SetupAndRunHTTPSource(t, h, []byte(`
+source: http
+listen_addr: 127.0.0.1:8080
+path: /test
+auth_type: headers
+headers:
+  key: test`), 2)
+
+	time.Sleep(1 * time.Second)
+
+	rawEvt := `{"test": "test"}`
+	errChan := make(chan error)
+
+	go assertEvents(out, []string{rawEvt, rawEvt}, errChan)
+
+	client := &http.Client{}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/test", testHTTPServerAddr), strings.NewReader(fmt.Sprintf("%s\n%s\n", rawEvt, rawEvt)))
+
+	require.NoError(t, err)
+
+	req.Header.Add("Key", "test")
+	req.Header.Add("Content-Type", "application/x-ndjson")
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	closeBody(t, resp)
+
+	err = <-errChan
+	require.NoError(t, err)
+
+	assertMetrics(t, reg, h.GetMetrics(), 2)
+
+	h.Server.Close()
+	tomb.Kill(nil)
+	err = tomb.Wait()
+	require.NoError(t, err)
+}
+
+func assertMetrics(t *testing.T, reg *prometheus.Registry, metrics []prometheus.Collector, expected int) {
+	promMetrics, err := reg.Gather()
+	require.NoError(t, err)
+
+	isExist := false
+
+	for _, metricFamily := range promMetrics {
+		if metricFamily.GetName() == "cs_httpsource_hits_total" {
+			isExist = true
+
+			assert.Len(t, metricFamily.GetMetric(), 1)
+
+			for _, metric := range metricFamily.GetMetric() {
+				assert.InDelta(t, float64(expected), metric.GetCounter().GetValue(), 0.000001)
+				labels := metric.GetLabel()
+				assert.Len(t, labels, 4)
+				assert.Equal(t, "acquis_type", labels[0].GetName())
+				assert.Empty(t, labels[0].GetValue())
+				assert.Equal(t, "datasource_type", labels[1].GetName())
+				assert.Equal(t, "http", labels[1].GetValue())
+				assert.Equal(t, "path", labels[2].GetName())
+				assert.Equal(t, "/test", labels[2].GetValue())
+				assert.Equal(t, "src", labels[3].GetName())
+				assert.Equal(t, "127.0.0.1", labels[3].GetValue())
+			}
+		}
+	}
+
+	if !isExist && expected > 0 {
+		t.Fatal("expected metric cs_httpsource_hits_total not found")
+	}
+
+	for _, metric := range metrics {
+		metric.(*prometheus.CounterVec).Reset()
+	}
+}

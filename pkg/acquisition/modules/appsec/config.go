@@ -1,0 +1,494 @@
+package appsecacquisition
+
+import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	yaml "github.com/goccy/go-yaml"
+	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
+
+	"github.com/crowdsecurity/crowdsec/pkg/acquisition/configuration"
+	"github.com/crowdsecurity/crowdsec/pkg/apiclient/useragent"
+	"github.com/crowdsecurity/crowdsec/pkg/appsec"
+	"github.com/crowdsecurity/crowdsec/pkg/appsec/allowlists"
+	"github.com/crowdsecurity/crowdsec/pkg/appsec/challenge"
+	"github.com/crowdsecurity/crowdsec/pkg/cwhub"
+	"github.com/crowdsecurity/crowdsec/pkg/exprhelpers"
+	"github.com/crowdsecurity/crowdsec/pkg/metrics"
+)
+
+var (
+	errMissingAPIKey = errors.New("missing API key")
+	errInvalidAPIKey = errors.New("invalid API key")
+)
+
+var (
+	DefaultAuthCacheDuration = (1 * time.Minute)
+	DefaultAuthTimeout       = (200 * time.Millisecond)
+	DefaultBodyReadTimeout   = (1 * time.Second)
+)
+
+// configuration structure of the acquis for the application security engine
+type Configuration struct {
+	ListenAddr        string         `yaml:"listen_addr"`
+	ListenSocket      string         `yaml:"listen_socket"`
+	CertFilePath      string         `yaml:"cert_file"`
+	KeyFilePath       string         `yaml:"key_file"`
+	Path              string         `yaml:"path"`
+	Routines          int            `yaml:"routines"`
+	AppsecConfig      string         `yaml:"appsec_config"`
+	AppsecConfigs     []string       `yaml:"appsec_configs"`
+	AppsecConfigPath  string         `yaml:"appsec_config_path"`
+	AuthCacheDuration *time.Duration `yaml:"auth_cache_duration"`
+	// AuthTimeout bounds the LAPI round-trip that validates a bouncer API key.
+	// Raise it when LAPI is several hops away. Set to 0 to disable. Defaults to DefaultAuthTimeout.
+	AuthTimeout *time.Duration `yaml:"auth_timeout"`
+	// BodyReadTimeout bounds how long we wait for the bouncer to finish sending the request body.
+	// Set to 0 to disable. Defaults to DefaultBodyReadTimeout.
+	BodyReadTimeout                   *time.Duration `yaml:"body_read_timeout"`
+	configuration.DataSourceCommonCfg `yaml:",inline"`
+}
+
+func (w *Source) UnmarshalConfig(yamlConfig []byte) error {
+	err := yaml.UnmarshalWithOptions(yamlConfig, &w.config, yaml.Strict())
+	if err != nil {
+		return fmt.Errorf("cannot parse appsec configuration: %s", yaml.FormatError(err, false, false))
+	}
+
+	if w.config.ListenAddr == "" && w.config.ListenSocket == "" {
+		w.config.ListenAddr = "127.0.0.1:7422"
+	}
+
+	if w.config.Path == "" {
+		w.config.Path = "/"
+	}
+
+	if w.config.Path[0] != '/' {
+		w.config.Path = "/" + w.config.Path
+	}
+
+	if w.config.Mode == "" {
+		w.config.Mode = configuration.TAIL_MODE
+	}
+
+	// always have at least one appsec routine
+	if w.config.Routines == 0 {
+		w.config.Routines = 1
+	}
+
+	if w.config.AppsecConfig == "" && w.config.AppsecConfigPath == "" && len(w.config.AppsecConfigs) == 0 {
+		return errors.New("appsec_config or appsec_config_path must be set")
+	}
+
+	if (w.config.AppsecConfig != "" || w.config.AppsecConfigPath != "") && len(w.config.AppsecConfigs) != 0 {
+		return errors.New("appsec_config and appsec_config_path are mutually exclusive with appsec_configs")
+	}
+
+	if w.config.Name == "" {
+		if w.config.ListenSocket != "" && w.config.ListenAddr == "" {
+			w.config.Name = w.config.ListenSocket
+		}
+
+		if w.config.ListenSocket == "" {
+			w.config.Name = fmt.Sprintf("%s%s", w.config.ListenAddr, w.config.Path)
+		}
+	}
+
+	return nil
+}
+
+func loadCertPool(caCertPath string, logger log.FieldLogger) (*x509.CertPool, error) {
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		logger.Warnf("Error loading system CA certificates: %s", err)
+	}
+
+	if caCertPool == nil {
+		caCertPool = x509.NewCertPool()
+	}
+
+	if caCertPath != "" {
+		caCert, err := os.ReadFile(caCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("while opening cert file: %w", err)
+		}
+
+		caCertPool.AppendCertsFromPEM(caCert)
+	}
+
+	return caCertPool, nil
+}
+
+// expandAppsecConfigEntry resolves a single appsec_config(s) entry into the list
+// of appsec-config item names to load. A literal entry is returned untouched. An entry containing a glob meta-character 
+// is matched against the installed appsec-configs with the same matcher used
+// to expand appsec-rule patterns; it errors when no installed config matches.
+func expandAppsecConfigEntry(entry string, hub *cwhub.Hub) ([]string, error) {
+	if !strings.ContainsAny(entry, "*?") {
+		return []string{entry}, nil
+	}
+
+	var matches []string
+
+	for _, item := range hub.GetInstalledByType(cwhub.APPSEC_CONFIGS, true) {
+		matched, err := exprhelpers.Match(entry, item.Name)
+		if err != nil {
+			return nil, fmt.Errorf("while matching %q against %q: %w", entry, item.Name, err)
+		}
+
+		if matched.(bool) {
+			matches = append(matches, item.Name)
+		}
+	}
+
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no installed appsec-config matches pattern %q", entry)
+	}
+
+	return matches, nil
+}
+
+// resolveAppsecConfigEntries expands every appsec_config(s) entry and returns
+// the de-duplicated list of config names to load, in first-seen order.
+func resolveAppsecConfigEntries(entries []string, hub *cwhub.Hub) ([]string, error) {
+	seen := make(map[string]struct{})
+
+	var toLoad []string
+
+	for _, entry := range entries {
+		names, err := expandAppsecConfigEntry(entry, hub)
+		if err != nil {
+			return nil, fmt.Errorf("unable to resolve appsec_config %q: %w", entry, err)
+		}
+
+		for _, name := range names {
+			if _, ok := seen[name]; ok {
+				continue
+			}
+
+			seen[name] = struct{}{}
+			toLoad = append(toLoad, name)
+		}
+	}
+
+	return toLoad, nil
+}
+
+func (w *Source) Configure(ctx context.Context, yamlConfig []byte, logger *log.Entry, _ metrics.AcquisitionMetricsLevel) error {
+	if w.hub == nil {
+		return errors.New("appsec datasource requires a hub. this is a bug, please report")
+	}
+
+	if w.lapiClientConfig == nil {
+		return errors.New("appsec datasource requires a lapi client configuration. this is a bug, please report")
+	}
+
+	if err := w.UnmarshalConfig(yamlConfig); err != nil {
+		return fmt.Errorf("unable to parse appsec configuration: %w", err)
+	}
+
+	if w.lapiClientConfig.Credentials == nil {
+		return errors.New("missing lapi client credentials")
+	}
+
+	w.lapiURL = fmt.Sprintf("%sv1/decisions/stream", w.lapiClientConfig.Credentials.URL)
+	w.AuthCache = NewAuthCache()
+
+	w.logger = logger
+	w.logger.Tracef("Appsec configuration: %+v", w.config)
+
+	if w.config.AuthCacheDuration == nil {
+		w.config.AuthCacheDuration = &DefaultAuthCacheDuration
+		w.logger.Infof("Cache duration for auth not set, using default: %v", *w.config.AuthCacheDuration)
+	}
+
+	if w.config.AuthTimeout == nil {
+		w.config.AuthTimeout = &DefaultAuthTimeout
+		w.logger.Infof("Auth timeout not set, using default: %v", *w.config.AuthTimeout)
+	}
+
+	if w.config.BodyReadTimeout == nil {
+		w.config.BodyReadTimeout = &DefaultBodyReadTimeout
+		w.logger.Infof("Body read timeout not set, using default: %v", *w.config.BodyReadTimeout)
+	}
+
+	w.mux = http.NewServeMux()
+
+	w.server = &http.Server{
+		Addr:      w.config.ListenAddr,
+		Handler:   w.mux,
+		Protocols: &http.Protocols{},
+	}
+
+	w.server.Protocols.SetHTTP1(true)
+	w.server.Protocols.SetUnencryptedHTTP2(true)
+	w.server.Protocols.SetHTTP2(true)
+
+	w.InChan = make(chan appsec.ParsedRequest)
+	appsecCfg := appsec.AppsecConfig{Logger: w.logger.WithField("component", "appsec_config")}
+
+	// we keep the datasource name
+	appsecCfg.Name = w.config.Name
+
+	// let's load the associated appsec_config:
+	if w.config.AppsecConfigPath != "" {
+		if err := appsecCfg.LoadByPath(w.config.AppsecConfigPath); err != nil {
+			return fmt.Errorf("unable to load appsec_config: %w", err)
+		}
+	} else if w.config.AppsecConfig != "" || len(w.config.AppsecConfigs) > 0 {
+		entries := w.config.AppsecConfigs
+		if w.config.AppsecConfig != "" {
+			entries = []string{w.config.AppsecConfig}
+		}
+
+		names, err := resolveAppsecConfigEntries(entries, w.hub)
+		if err != nil {
+			return err
+		}
+
+		for _, name := range names {
+			if err := appsecCfg.Load(name, w.hub); err != nil {
+				return fmt.Errorf("unable to load appsec_config: %w", err)
+			}
+		}
+	} else {
+		return errors.New("no appsec_config provided")
+	}
+
+	// Now we can set up the logger
+	appsecCfg.SetUpLogger()
+
+	appsecRuntime, err := appsecCfg.Build(ctx, w.hub)
+	if err != nil {
+		return fmt.Errorf("unable to build appsec_config: %w", err)
+	}
+
+	if appsecRuntime.NeedWASMVM {
+		logger.Info("Initializing WASM runtime for challenge obfuscation")
+
+		challengeOpts, err := challenge.BuildOptions(appsecCfg.Challenge, appsecCfg.Logger)
+		if err != nil {
+			return fmt.Errorf("unable to build challenge options: %w", err)
+		}
+
+		challengeRuntime, err := challenge.NewChallengeRuntime(ctx, challengeOpts...)
+		if err != nil {
+			return fmt.Errorf("unable to create challenge runtime: %w", err)
+		}
+		appsecRuntime.ChallengeRuntime = challengeRuntime
+	}
+
+	w.AppsecRuntime = appsecRuntime
+	w.AppsecRuntime.Labels = w.config.Labels
+	w.AppsecRuntime.DataDir = w.hub.GetDataDir()
+
+	err = w.AppsecRuntime.ProcessOnLoadRules()
+	if err != nil {
+		return fmt.Errorf("unable to process on load rules: %w", err)
+	}
+
+	w.AppsecRunners = make([]AppsecRunner, w.config.Routines)
+
+	w.appsecAllowlistClient = allowlists.NewAppsecAllowlist(w.logger)
+
+	for nbRoutine := range w.config.Routines {
+		appsecRunnerUUID := uuid.New().String()
+		runner := AppsecRunner{
+			inChan:                 w.InChan,
+			UUID:                   appsecRunnerUUID,
+			logger:                 w.logger.WithField("runner_uuid", appsecRunnerUUID),
+			AppsecRuntime:          w.AppsecRuntime,
+			Labels:                 w.config.Labels,
+			appsecAllowlistsClient: w.appsecAllowlistClient,
+		}
+
+		if err = runner.Init(w.hub.GetDataDir()); err != nil {
+			return fmt.Errorf("unable to initialize runner: %w", err)
+		}
+
+		w.AppsecRunners[nbRoutine] = runner
+	}
+
+	w.logger.Infof("Created %d appsec runners", len(w.AppsecRunners))
+
+	// We don´t use the wrapper provided by coraza because we want to fully control what happens when a rule match to send the information in crowdsec
+	w.mux.HandleFunc(w.config.Path, w.appsecHandler)
+
+	caCertPath := ""
+
+	if w.lapiClientConfig != nil && w.lapiClientConfig.Credentials != nil {
+		caCertPath = w.lapiClientConfig.Credentials.CACertPath
+	}
+
+	w.lapiCACertPool, err = loadCertPool(caCertPath, w.logger)
+	if err != nil {
+		return fmt.Errorf("unable to load LAPI CA cert pool: %w", err)
+	}
+
+	w.httpClient = &http.Client{
+		Timeout: *w.config.AuthTimeout,
+	}
+	if w.lapiCACertPool != nil {
+		w.httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: w.lapiCACertPool,
+			},
+		}
+	}
+
+	return nil
+}
+
+func (w *Source) isValidKey(ctx context.Context, apiKey string) (bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, w.lapiURL, http.NoBody)
+	if err != nil {
+		w.logger.Errorf("Error creating request: %s", err)
+		return false, err
+	}
+
+	req.Header.Add("X-Api-Key", apiKey)
+	req.Header.Add("User-Agent", useragent.AppsecUserAgent())
+
+	resp, err := w.httpClient.Do(req)
+	if err != nil {
+		w.logger.Errorf("Error performing request: %s", err)
+		return false, err
+	}
+
+	defer resp.Body.Close()
+
+	return resp.StatusCode == http.StatusOK, nil
+}
+
+// validateKey probes LAPI, collapsing concurrent probes for the same key into one.
+func (w *Source) validateKey(ctx context.Context, apiKey string) (bool, error) {
+	// The probe is shared, so it must not die with whichever request happened to
+	// trigger it. w.httpClient.Timeout bounds it.
+	ctx = context.WithoutCancel(ctx)
+
+	res, err, _ := w.authGroup.Do(apiKey, func() (any, error) {
+		return w.isValidKey(ctx, apiKey)
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return res.(bool), nil
+}
+
+func (w *Source) checkAuth(ctx context.Context, apiKey string) error {
+	if apiKey == "" {
+		return errMissingAPIKey
+	}
+
+	expiration, exists := w.AuthCache.Get(apiKey)
+	now := time.Now()
+
+	if exists && !now.After(expiration) {
+		return nil
+	}
+
+	isAuth, err := w.validateKey(ctx, apiKey)
+	if err != nil {
+		if !exists { // Nothing cached, we cannot vouch for this key
+			w.logger.Errorf("Error checking auth for API key: %s", err)
+			return errInvalidAPIKey
+		}
+
+		// Known key and LAPI is unreachable, keep it rather than break traffic
+		w.logger.Errorf("Error checking auth for API key: %s, extending cache duration", err)
+		w.AuthCache.Set(apiKey, now.Add(*w.config.AuthCacheDuration))
+
+		return nil
+	}
+
+	if !isAuth {
+		w.AuthCache.Delete(apiKey)
+		return errInvalidAPIKey
+	}
+
+	w.AuthCache.Set(apiKey, now.Add(*w.config.AuthCacheDuration))
+
+	return nil
+}
+
+// should this be in the runner ?
+func (w *Source) appsecHandler(rw http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	w.logger.Debugf("Received request from '%s' on %s", r.RemoteAddr, r.URL.Path)
+
+	apiKey := r.Header.Get(appsec.APIKeyHeaderName)
+	clientIP := r.Header.Get(appsec.IPHeaderName)
+	remoteIP := r.RemoteAddr
+
+	if err := w.checkAuth(ctx, apiKey); err != nil {
+		w.logger.Errorf("Unauthorized request from '%s' (real IP = %s): %s", remoteIP, clientIP, err)
+		rw.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Force client to send the body quickly enough.
+	// In practice, this is not a real issue as bouncers are trusted and assumed to behave properly,
+	// but some bouncers may take time to forward POST request with an empty body
+	// which would make us wait for several seconds on each empty-body request.
+	if *w.config.BodyReadTimeout > 0 {
+		if err := http.NewResponseController(rw).SetReadDeadline(time.Now().Add(*w.config.BodyReadTimeout)); err != nil {
+			w.logger.Debugf("unable to set read deadline: %s", err)
+		}
+	}
+
+	// parse the request only once
+	parsedRequest, err := appsec.NewParsedRequestFromRequest(r, w.logger, w.AppsecRuntime.BodySettings)
+	if err != nil {
+		w.logger.Errorf("%s", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+
+		return
+	}
+
+	parsedRequest.AppsecEngine = w.config.Name
+
+	logger := w.logger.WithFields(log.Fields{
+		"request_uuid": parsedRequest.UUID,
+		"client_ip":    parsedRequest.ClientIP,
+	})
+
+	metrics.AppsecReqCounter.With(prometheus.Labels{"source": parsedRequest.RemoteAddrNormalized, "appsec_engine": parsedRequest.AppsecEngine}).Inc()
+
+	w.InChan <- parsedRequest
+
+	/*
+		response is a copy of w.AppSecRuntime.Response that is safe to use.
+		As OutOfBand might still be running, the original one can be modified
+	*/
+	response := <-parsedRequest.ResponseChannel
+
+	if response.InBandInterrupt {
+		metrics.AppsecBlockCounter.With(prometheus.Labels{"source": parsedRequest.RemoteAddrNormalized, "appsec_engine": parsedRequest.AppsecEngine}).Inc()
+	}
+
+	statusCode, appsecResponse := w.AppsecRuntime.GenerateResponse(response, logger)
+	logger.Debugf("Response: %+v", appsecResponse)
+
+	rw.WriteHeader(statusCode)
+
+	body, err := json.Marshal(appsecResponse)
+	if err != nil {
+		logger.Errorf("unable to serialize response: %s", err)
+		rw.WriteHeader(http.StatusInternalServerError)
+	} else {
+		if _, err := rw.Write(body); err != nil {
+			logger.Errorf("unable to write response: %s", err)
+		}
+	}
+}

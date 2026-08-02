@@ -1,0 +1,16 @@
+type: leaky
+name: sasikiran/net-flood
+description: "Detect TCP port scan and connection flood from remote attacker"
+filter: "evt.Meta.log_type == 'sasikiran_net_attack'"
+leakspeed: 5s
+capacity: 6
+groupby: evt.Meta.source_ip
+blackhole: 1m
+reprocess: true
+labels:
+  service: sasikiran-net
+  confidence: 3
+  spoofable: 0
+  label: "Network Port Scan / Flood"
+  behavior: "network:scan"
+  remediation: true

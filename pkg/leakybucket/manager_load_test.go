@@ -1,0 +1,147 @@
+package leakybucket
+
+import (
+	"fmt"
+	"testing"
+)
+
+type cfgTest struct {
+	cfg      BucketFactory
+	loadable bool
+	valid    bool
+}
+
+func runTest(tests []cfgTest) error {
+	for idx, cfg := range tests {
+		err := cfg.cfg.LoadBucket()
+		if cfg.loadable && err != nil {
+			return fmt.Errorf("expected loadable result (%d/%d), got: %s", idx+1, len(tests), err)
+		}
+		if !cfg.loadable && err == nil {
+			return fmt.Errorf("expected unloadable result (%d/%d)", idx+1, len(tests))
+		}
+		err = cfg.cfg.Validate()
+		if cfg.valid && err != nil {
+			return fmt.Errorf("expected valid result (%d/%d), got: %s", idx+1, len(tests), err)
+		}
+		if !cfg.valid && err == nil {
+			return fmt.Errorf("expected invalid result (%d/%d)", idx+1, len(tests))
+		}
+	}
+	return nil
+}
+
+func TestBadBucketsConfig(t *testing.T) {
+	var CfgTests = []cfgTest{
+		// empty
+		{BucketFactory{}, false, false},
+		// missing description
+		{BucketFactory{Spec: BucketSpec{Name: "test"}}, false, false},
+		// missing type
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1"}}, false, false},
+		// bad type
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "ratata"}}, false, false},
+	}
+	if err := runTest(CfgTests); err != nil {
+		t.Fatalf("%s", err)
+	}
+}
+
+func TestLeakyBucketsConfig(t *testing.T) {
+	CfgTests := []cfgTest{
+		// leaky with bad capacity
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 0}}, false, false},
+		// leaky with empty leakspeed
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1}}, false, false},
+		// leaky with missing filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s"}}, false, true},
+		// leaky with invalid leakspeed
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "abs", Filter: "true"}}, false, false},
+		// leaky with valid filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true"}}, true, true},
+		// leaky with invalid filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "xu"}}, false, true},
+		// leaky with invalid uniq
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true", Distinct: "foo"}}, false, true},
+		// leaky with valid uniq
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true", Distinct: "evt.Parsed.foobar"}}, true, true},
+		// leaky with valid filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true"}}, true, true},
+		// leaky with bad overflow filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true", OverflowFilter: "xu"}}, false, true},
+		// leaky with valid overflow filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true", OverflowFilter: "true"}}, true, true},
+		// leaky with invalid cancel_on filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true", CancelOnFilter: "xu"}}, false, true},
+		// leaky with valid cancel_on filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true", CancelOnFilter: "true"}}, true, true},
+		// leaky with invalid conditional overflow filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true", ConditionalOverflow: "xu"}}, false, true},
+		// leaky with valid conditional overflow filter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "leaky", Capacity: 1, LeakSpeed: "1s", Filter: "true", ConditionalOverflow: "true"}}, true, true},
+	}
+
+	if err := runTest(CfgTests); err != nil {
+		t.Fatalf("%s", err)
+	}
+}
+
+func TestBlackholeConfig(t *testing.T) {
+	CfgTests := []cfgTest{
+		// basic bh
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "trigger", Filter: "true", Blackhole: "15s"}}, true, true},
+		// bad bh
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "trigger", Filter: "true", Blackhole: "abc"}}, false, true},
+	}
+
+	if err := runTest(CfgTests); err != nil {
+		t.Fatalf("%s", err)
+	}
+}
+
+func TestTriggerBucketsConfig(t *testing.T) {
+	CfgTests := []cfgTest{
+		// basic valid counter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "trigger", Filter: "true"}}, true, true},
+	}
+
+	if err := runTest(CfgTests); err != nil {
+		t.Fatalf("%s", err)
+	}
+}
+
+func TestCounterBucketsConfig(t *testing.T) {
+	CfgTests := []cfgTest{
+		// basic valid counter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "counter", Capacity: -1, Duration: "5s", Filter: "true"}}, true, true},
+		// missing duration
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "counter", Capacity: -1, Filter: "true"}}, false, false},
+		// bad duration
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "counter", Capacity: -1, Duration: "abc", Filter: "true"}}, false, false},
+		// capacity must be -1
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "counter", Capacity: 0, Duration: "5s", Filter: "true"}}, false, false},
+	}
+	if err := runTest(CfgTests); err != nil {
+		t.Fatalf("%s", err)
+	}
+}
+
+func TestBayesianBucketsConfig(t *testing.T) {
+	CfgTests := []cfgTest{
+		// basic valid counter
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "bayesian", Capacity: -1, Filter: "true", BayesianPrior: 0.5, BayesianThreshold: 0.5, BayesianConditions: []RawBayesianCondition{{ConditionalFilterName: "true", ProbGivenEvil: 0.5, ProbGivenBenign: 0.5}}}}, true, true},
+		// bad capacity
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "bayesian", Capacity: 1, Filter: "true", BayesianPrior: 0.5, BayesianThreshold: 0.5, BayesianConditions: []RawBayesianCondition{{ConditionalFilterName: "true", ProbGivenEvil: 0.5, ProbGivenBenign: 0.5}}}}, false, false},
+		// missing prior
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "bayesian", Capacity: -1, Filter: "true", BayesianThreshold: 0.5, BayesianConditions: []RawBayesianCondition{{ConditionalFilterName: "true", ProbGivenEvil: 0.5, ProbGivenBenign: 0.5}}}}, false, false},
+		// missing threshold
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "bayesian", Capacity: -1, Filter: "true", BayesianPrior: 0.5, BayesianConditions: []RawBayesianCondition{{ConditionalFilterName: "true", ProbGivenEvil: 0.5, ProbGivenBenign: 0.5}}}}, false, false},
+		// bad prior
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "bayesian", Capacity: -1, Filter: "true", BayesianPrior: 1.5, BayesianThreshold: 0.5, BayesianConditions: []RawBayesianCondition{{ConditionalFilterName: "true", ProbGivenEvil: 0.5, ProbGivenBenign: 0.5}}}}, false, false},
+		// bad threshold
+		{BucketFactory{Spec: BucketSpec{Name: "test", Description: "test1", Type: "bayesian", Capacity: -1, Filter: "true", BayesianPrior: 0.5, BayesianThreshold: 1.5, BayesianConditions: []RawBayesianCondition{{ConditionalFilterName: "true", ProbGivenEvil: 0.5, ProbGivenBenign: 0.5}}}}, false, false},
+	}
+	if err := runTest(CfgTests); err != nil {
+		t.Fatalf("%s", err)
+	}
+}

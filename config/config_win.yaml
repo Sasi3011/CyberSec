@@ -1,0 +1,36 @@
+common:
+  log_media: file
+  log_level: info
+  log_dir:  C:\ProgramData\SasikiranSec\log\
+config_paths:
+  config_dir:  C:\ProgramData\SasikiranSec\config\
+  data_dir:  C:\ProgramData\SasikiranSec\data\
+  simulation_path:   C:\ProgramData\SasikiranSec\config\simulation.yaml
+  hub_dir:  C:\ProgramData\SasikiranSec\hub\
+  index_path:  C:\ProgramData\SasikiranSec\hub\.index.json
+  plugin_dir: C:\ProgramData\SasikiranSec\plugins\
+  notification_dir:  C:\ProgramData\SasikiranSec\config\notifications\
+crowdsec_service:
+  acquisition_path:  C:\ProgramData\SasikiranSec\config\acquis.yaml
+  parser_routines: 1
+cscli:
+  output: human
+db_config:
+  log_level: info
+  type: sqlite
+  db_path:  C:\ProgramData\SasikiranSec\data\sasikiransec.db
+api:
+  client:
+    insecure_skip_verify: false
+    credentials_path:  C:\ProgramData\SasikiranSec\config\local_api_credentials.yaml
+  server:
+    log_level: info
+    listen_uri: 127.0.0.1:8080
+    profiles_path: C:\ProgramData\SasikiranSec\config\profiles.yaml
+    online_client:
+      credentials_path:  C:\ProgramData\SasikiranSec\config\online_api_credentials.yaml
+prometheus:
+  enabled: true
+  level: full
+  listen_addr: 127.0.0.1
+  listen_port: 6060

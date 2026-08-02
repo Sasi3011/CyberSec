@@ -1,0 +1,9 @@
+type: trigger
+debug: true
+name: test/simple-postoverflow-scenario
+description: "Simple post overflow"
+#filter: true
+filter: "evt.Overflow.Alert != nil && evt.Overflow.Alert.Scenario != nil"
+labels:
+ type: overflow_2
+

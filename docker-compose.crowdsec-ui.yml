@@ -1,0 +1,18 @@
+# CrowdSec Web UI - standard local dashboard for CrowdSec LAPI
+# https://github.com/TheDuffman85/crowdsec-web-ui
+#
+# CrowdSec removed their old official local UI (cscli dashboard / Metabase).
+# This is the community dashboard used to view alerts locally.
+
+services:
+  crowdsec-web-ui:
+    image: ghcr.io/theduffman85/crowdsec-web-ui:latest
+    container_name: crowdsec_web_ui
+    ports:
+      - "3001:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./.local/crowdsec-web-ui/data:/app/data
+      - ./.local/crowdsec-web-ui/secrets/crowdsec_password.txt:/run/secrets/crowdsec_password:ro
+    restart: unless-stopped

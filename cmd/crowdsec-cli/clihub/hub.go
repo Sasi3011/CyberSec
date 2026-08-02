@@ -1,0 +1,399 @@
+package clihub
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"github.com/fatih/color"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+
+	"github.com/crowdsecurity/crowdsec/cmd/crowdsec-cli/core/args"
+	"github.com/crowdsecurity/crowdsec/cmd/crowdsec-cli/core/reload"
+	"github.com/crowdsecurity/crowdsec/cmd/crowdsec-cli/core/require"
+	"github.com/crowdsecurity/crowdsec/pkg/csconfig"
+	"github.com/crowdsecurity/crowdsec/pkg/cwhub"
+	"github.com/crowdsecurity/crowdsec/pkg/hubops"
+)
+
+type cliHub struct {
+	cfg csconfig.Getter
+}
+
+func New(cfg csconfig.Getter) *cliHub {
+	return &cliHub{
+		cfg: cfg,
+	}
+}
+
+func (cli *cliHub) NewCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "hub [action]",
+		Short: "Manage hub index",
+		Long: `Hub management
+
+List/update parsers/scenarios/postoverflows/collections from [Crowdsec Hub](https://hub.crowdsec.net).
+The Hub is managed by cscli, to get the latest hub files from [Crowdsec Hub](https://hub.crowdsec.net), you need to update.`,
+		Example: `cscli hub list
+cscli hub update
+cscli hub upgrade`,
+		DisableAutoGenTag: true,
+		Args:              args.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Usage()
+		},
+	}
+
+	cmd.AddCommand(cli.newBranchCmd())
+	cmd.AddCommand(cli.newListCmd())
+	cmd.AddCommand(cli.newSearchCmd())
+	cmd.AddCommand(cli.newUpdateCmd())
+	cmd.AddCommand(cli.newUpgradeCmd())
+	cmd.AddCommand(cli.newTypesCmd())
+
+	return cmd
+}
+
+func (cli *cliHub) List(out io.Writer, hub *cwhub.Hub, all bool, full bool, statuses []string) error {
+	cfg := cli.cfg()
+
+	for _, v := range hub.Warnings {
+		fmt.Fprintln(os.Stderr, v)
+	}
+
+	for _, line := range hub.ItemStats() {
+		fmt.Fprintln(os.Stderr, line)
+	}
+
+	// json/raw keep the per-type structure for scripts, regardless of the human view
+	if cfg.Cscli.Output != "human" {
+		items, err := itemsByType(hub, all, statuses)
+		if err != nil {
+			return err
+		}
+
+		return ListItems(out, cfg.Cscli.Color, cwhub.ItemTypes, items, true, cfg.Cscli.Output)
+	}
+
+	// -a: flat table of every item type (installed and not)
+	if all {
+		items, err := itemsByType(hub, all, statuses)
+		if err != nil {
+			return err
+		}
+
+		merged := make([]*cwhub.Item, 0)
+		for _, itemType := range cwhub.ItemTypes {
+			merged = append(merged, items[itemType]...)
+		}
+
+		if len(merged) == 0 {
+			fmt.Fprintln(out, "No items to display")
+			return nil
+		}
+
+		renderItemTable(out, cfg.Cscli.Color, flatRows(merged), false)
+
+		return nil
+	}
+
+	// default: a tree of installed items (sub-collections nested), then standalone items.
+	// cwhub owns the tree; status/full pruning happens in the flatten walk.
+	forest := hub.InstalledItems()
+
+	var rows []overviewRow
+	for _, node := range forest {
+		rows = append(rows, treeRows(node, 0, statuses, full)...)
+	}
+
+	// --full is exhaustive: also surface installed items the tree places nowhere (e.g. a sub-item
+	// kept after its parent collection was removed). items[] is already installed + status-filtered.
+	if full {
+		items, err := itemsByType(hub, all, statuses)
+		if err != nil {
+			return err
+		}
+
+		placed := placedInTree(forest)
+
+		for _, itemType := range cwhub.ItemTypes {
+			for _, item := range items[itemType] {
+				if !placed[item.FQName()] {
+					rows = append(rows, overviewRow{item: item})
+				}
+			}
+		}
+	}
+
+	if len(rows) == 0 {
+		fmt.Fprintln(out, "No items to display")
+		return nil
+	}
+
+	renderItemTable(out, cfg.Cscli.Color, rows, false)
+
+	return nil
+}
+
+func (cli *cliHub) newBranchCmd() *cobra.Command {
+	var all bool
+
+	cmd := &cobra.Command{
+		Use:               "branch",
+		Short:             "Show selected hub branch",
+		Long:              "Display the hub branch to be used, depending on configuration and crowdsec version",
+		Args:              args.NoArgs,
+		DisableAutoGenTag: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			branch, err := require.HubBranch(cmd.Context(), cli.cfg())
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintln(os.Stdout, branch)
+			return nil
+		},
+	}
+
+	flags := cmd.Flags()
+	flags.BoolVarP(&all, "all", "a", false, "List all available items, including those not installed")
+
+	return cmd
+}
+
+func (cli *cliHub) newListCmd() *cobra.Command {
+	var (
+		all      bool
+		full     bool
+		statuses []string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "list [-a]",
+		Short: "List relevant installed items",
+		Long: `List installed relevant items (collections, standalone items) and shows their status.
+Use --all to list all items, including those not installed.
+Use --full to list every installed item individually, instead of summarizing collection contents.`,
+		Args:              args.NoArgs,
+		DisableAutoGenTag: true,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			if err := validateStatuses(statuses); err != nil {
+				return err
+			}
+
+			hub, err := require.Hub(cli.cfg(), log.StandardLogger())
+			if err != nil {
+				return err
+			}
+
+			return cli.List(color.Output, hub, all, full, statuses)
+		},
+	}
+
+	flags := cmd.Flags()
+	flags.BoolVarP(&all, "all", "a", false, "List all available items, including those not installed")
+	flags.BoolVar(&full, "full", false, "List every installed item individually instead of summarizing collection contents")
+	flags.StringSliceVar(&statuses, "status", nil, "Filter by status ("+strings.Join(validItemStatuses, ", ")+")")
+	cmd.MarkFlagsMutuallyExclusive("all", "full")
+
+	_ = cmd.RegisterFlagCompletionFunc("status", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return validItemStatuses, cobra.ShellCompDirectiveNoFileComp
+	})
+
+	return cmd
+}
+
+func (cli *cliHub) update(ctx context.Context, withContent bool) error {
+	local := cli.cfg().Hub
+	// don't use require.Hub because if there is no index file, it would fail
+	hub, err := cwhub.NewHub(local, log.StandardLogger())
+	if err != nil {
+		return err
+	}
+
+	indexProvider, err := require.HubDownloader(ctx, cli.cfg())
+	if err != nil {
+		return err
+	}
+
+	updated, err := hub.Update(ctx, indexProvider, withContent)
+	if err != nil {
+		return fmt.Errorf("failed to update hub: %w", err)
+	}
+
+	if !updated && (log.StandardLogger().Level >= log.InfoLevel) {
+		fmt.Fprintln(os.Stdout, "Nothing to do, the hub index is up to date.")
+	}
+
+	if err := hub.Load(); err != nil {
+		return fmt.Errorf("failed to load hub: %w", err)
+	}
+
+	for _, v := range hub.Warnings {
+		fmt.Fprintln(os.Stderr, v)
+	}
+
+	return nil
+}
+
+func (cli *cliHub) newUpdateCmd() *cobra.Command {
+	withContent := false
+
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "Download the latest index (catalog of available configurations)",
+		Long: `
+Fetches the .index.json file from the hub, containing the list of available configs.
+`,
+		Example: `# Download the last version of the index file.
+cscli hub update
+
+# Download a 4x bigger version with all item contents (effectively pre-caching item downloads, but not data files).
+cscli hub update --with-content`,
+		Args:              args.NoArgs,
+		DisableAutoGenTag: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if cmd.Flags().Changed("with-content") {
+				return cli.update(cmd.Context(), withContent)
+			}
+			return cli.update(cmd.Context(), cli.cfg().Cscli.HubWithContent)
+		},
+	}
+
+	flags := cmd.Flags()
+	flags.BoolVar(&withContent, "with-content", false, "Download index with embedded item content")
+
+	return cmd
+}
+
+func (cli *cliHub) upgrade(ctx context.Context, interactive bool, dryRun bool, force bool) error {
+	cfg := cli.cfg()
+
+	hub, err := require.Hub(cfg, log.StandardLogger())
+	if err != nil {
+		return err
+	}
+
+	plan := hubops.NewActionPlan(hub)
+
+	contentProvider, err := require.HubDownloader(ctx, cfg)
+	if err != nil {
+		return err
+	}
+
+	for _, itemType := range cwhub.ItemTypes {
+		for _, item := range hub.GetInstalledByType(itemType, true) {
+			if err := plan.AddCommand(hubops.NewDownloadCommand(item, contentProvider, force)); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := plan.AddCommand(hubops.NewDataRefreshCommand(force)); err != nil {
+		return err
+	}
+
+	showPlan := (log.StandardLogger().Level >= log.InfoLevel)
+	verbosePlan := (cfg.Cscli.Output == "raw")
+
+	err = plan.Execute(ctx, interactive, dryRun, showPlan, verbosePlan)
+	if err != nil {
+		if !errors.Is(err, hubops.ErrUserCanceled) {
+			return err
+		}
+		// not a real error, and we'll want to print the reload message anyway
+		fmt.Fprintln(os.Stdout, err.Error())
+	}
+
+	if msg := reload.UserMessage(); msg != "" && plan.ReloadNeeded {
+		fmt.Fprintln(os.Stdout, "\n"+msg)
+	}
+
+	return nil
+}
+
+func (cli *cliHub) newUpgradeCmd() *cobra.Command {
+	var (
+		interactive bool
+		dryRun      bool
+		force       bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "upgrade",
+		Short: "Upgrade all configurations to their latest version",
+		Long: `
+Upgrade all configs installed from Crowdsec Hub. Run 'sudo cscli hub update' if you want the latest versions available.
+`,
+		Example: `# Upgrade all the collections, scenarios etc. to the latest version in the downloaded index. Update data files too.
+cscli hub upgrade
+
+# Upgrade tainted items as well; force re-download of data files.
+cscli hub upgrade --force
+
+# Prompt for confirmation if running in an interactive terminal; otherwise, the option is ignored.
+cscli hub upgrade --interactive
+cscli hub upgrade -i`,
+		Args:              args.NoArgs,
+		DisableAutoGenTag: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cli.upgrade(cmd.Context(), interactive, dryRun, force)
+		},
+	}
+
+	flags := cmd.Flags()
+	flags.BoolVarP(&interactive, "interactive", "i", false, "Ask for confirmation before proceeding")
+	flags.BoolVar(&dryRun, "dry-run", false, "Don't install or remove anything; print the execution plan")
+	flags.BoolVar(&force, "force", false, "Force upgrade: overwrite tainted and outdated items; always update data files")
+	cmd.MarkFlagsMutuallyExclusive("interactive", "dry-run")
+
+	return cmd
+}
+
+func (cli *cliHub) types() error {
+	switch cli.cfg().Cscli.Output {
+	case "human":
+		s, err := yaml.Marshal(cwhub.ItemTypes)
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprint(os.Stdout, string(s))
+	case "json":
+		jsonStr, err := json.Marshal(cwhub.ItemTypes)
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprintln(os.Stdout, string(jsonStr))
+	case "raw":
+		for _, itemType := range cwhub.ItemTypes {
+			fmt.Fprintln(os.Stdout, itemType)
+		}
+	}
+
+	return nil
+}
+
+func (cli *cliHub) newTypesCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "types",
+		Short: "List supported item types",
+		Long: `
+List the types of supported hub items.
+`,
+		Args:              args.NoArgs,
+		DisableAutoGenTag: true,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return cli.types()
+		},
+	}
+
+	return cmd
+}
